@@ -1,63 +1,66 @@
-import jwt
-from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from . import models, db
-from sqlalchemy.orm import Session
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
+from supabase import Client
 
-from .config import Settings
+from .config import settings
+from .db import get_supabase
 
-settings = Settings()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+security = HTTPBearer()
 
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    supabase: Client = Depends(get_supabase),
+) -> dict:
+    """Verify Supabase JWT and return user data from public.users."""
+    token = credentials.credentials
 
-    return encoded_jwt
-
-
-def verify_token(token: str, credentials_exception):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        if user_id is None:
-            raise credentials_exception
-        token_data = {"id": user_id}
-        return token_data
-    except Exception:
-        raise credentials_exception
-
-
-def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(db.get_db)
-):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid credentials",
+        detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    token = verify_token(token, credentials_exception)
-    user = db.query(models.Clients).filter(models.Clients.id == token["id"]).first()
-    if not user:
+
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated",
+        )
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
         raise credentials_exception
-    else:
-        return user
+
+    result = (
+        supabase.table("users")
+        .select("*")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not found",
+        )
+
+    return result.data
 
 
-def create_reset_token(email: str, expires_delta: int):
-    to_encode = {"email": email}
-    expire = datetime.utcnow() + timedelta(minutes=expires_delta)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-    return encoded_jwt
+def require_role(required_role: str):
+    """Dependency factory that checks if user has the required role."""
+    async def role_checker(
+        current_user: dict = Depends(get_current_user),
+    ) -> dict:
+        if current_user["role"] != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Requires '{required_role}' role.",
+            )
+        return current_user
+    return role_checker

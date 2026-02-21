@@ -27,6 +27,10 @@ openai
 anthropic
 # FHIR export
 fhirclient
+# Supabase
+supabase
+python-jose[cryptography]
+email-validator
 # Security
 cryptography
 pyotp
