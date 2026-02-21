@@ -227,7 +227,10 @@ def create_session(
             "chief_complaint": body.chief_complaint,
         },
     }
-    supabase.table("notifications").insert(notification).execute()
+    try:
+        supabase.table("notifications").insert(notification).execute()
+    except Exception as e:
+        logger.warning(f"Failed to persist notification: {e}")
 
     # Send real-time WS notification to patient
     import asyncio
