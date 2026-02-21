@@ -58,6 +58,14 @@ export async function getSessionDocuments(token, sessionId) {
   return authFetch(`${DOCUMENTS_API}/session/${sessionId}`, {}, token);
 }
 
-export async function getDocumentAnalysis(token, documentId) {
-  return authFetch(`${DOCUMENTS_API}/${documentId}/analysis`, {}, token);
+export async function deleteDocument(token, documentId) {
+  const res = await fetch(`${DOCUMENTS_API}/${documentId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Delete failed");
+  }
 }
+

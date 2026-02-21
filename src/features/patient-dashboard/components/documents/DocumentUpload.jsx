@@ -44,30 +44,20 @@ export default function DocumentUpload({ onUpload }) {
   async function handleUpload() {
     if (!file || !documentType) return;
     setUploading(true);
-    setProgress(0);
+    setProgress(30);
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 150);
-
-    // Simulate completion
-    setTimeout(() => {
-      clearInterval(interval);
+    try {
+      await onUpload(file, documentType);
       setProgress(100);
-      onUpload(file, documentType);
       setTimeout(() => {
         setUploading(false);
         setProgress(0);
         clearFile();
-      }, 500);
-    }, 1500);
+      }, 400);
+    } catch {
+      setUploading(false);
+      setProgress(0);
+    }
   }
 
   return (

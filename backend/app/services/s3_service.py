@@ -38,6 +38,7 @@ def upload_file(content: bytes, key: str, content_type: str = "application/octet
     return key
 
 
+
 def generate_presigned_url(key: str, expiry: int = 3600) -> str:
     """Generate a presigned GET URL for an S3 object."""
     client = _get_client()

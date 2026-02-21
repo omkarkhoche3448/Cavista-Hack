@@ -1,38 +1,58 @@
-import { useState } from "react";
-import { MOCK_DOCUMENTS, DOCUMENT_TYPE_LABELS } from "../../data/mockData";
+import { useState, useEffect } from "react";
+import { DOCUMENT_TYPE_LABELS } from "../../data/mockData";
 import DocumentUpload from "./DocumentUpload";
 import DocumentCard from "./DocumentCard";
 import { FileText, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/features/auth";
+import { uploadDocument, listDocuments, deleteDocument } from "@/services/documentService";
 
 export default function MyDocumentsPage() {
-  const [documents, setDocuments] = useState(MOCK_DOCUMENTS);
+  const { session } = useAuth();
+  const token = session?.access_token;
+  const [documents, setDocuments] = useState([]);
 
-  function handleUpload(file, documentType) {
-    const newDoc = {
-      id: `doc-${Date.now()}`,
-      patient_id: "u-001",
-      document_type: documentType,
-      original_file_name: file.name,
-      status: "uploaded",
-      file_size_bytes: file.size,
-      mime_type: file.type,
-      version: 1,
-      created_at: new Date().toISOString(),
-    };
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    listDocuments(token)
+      .then(data => { if (!cancelled) setDocuments(Array.isArray(data) ? data : []); })
+      .catch(err => console.error("[MyDocumentsPage] Failed to fetch documents:", err));
+    return () => { cancelled = true; };
+  }, [token]);
 
-    setDocuments((prev) => [newDoc, ...prev]);
-    toast.success("Document uploaded", {
-      description: `${file.name} has been uploaded as ${DOCUMENT_TYPE_LABELS[documentType]}.`,
-    });
+  async function handleUpload(file, documentType) {
+    if (!token) {
+      toast.error("Not authenticated");
+      return;
+    }
+    try {
+      const newDoc = await uploadDocument(token, {
+        file,
+        title: file.name,
+        documentType,
+      });
+      setDocuments((prev) => [newDoc, ...prev]);
+      toast.success("Document uploaded", {
+        description: `${file.name} has been uploaded as ${DOCUMENT_TYPE_LABELS[documentType]}.`,
+      });
+    } catch (err) {
+      toast.error("Upload failed", { description: err.message });
+      throw err;
+    }
   }
 
-  function handleDelete(id) {
+  async function handleDelete(id) {
     const doc = documents.find((d) => d.id === id);
-    setDocuments((prev) => prev.filter((d) => d.id !== id));
-    toast.success("Document removed", {
-      description: doc ? `${doc.original_file_name} has been removed.` : "Document removed.",
-    });
+    try {
+      await deleteDocument(token, id);
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      toast.success("Document removed", {
+        description: doc ? `${doc.title || doc.file_name} has been removed.` : "Document removed.",
+      });
+    } catch (err) {
+      toast.error("Delete failed", { description: err.message });
+    }
   }
 
   return (
