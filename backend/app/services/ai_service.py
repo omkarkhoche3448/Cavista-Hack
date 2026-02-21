@@ -4,6 +4,7 @@ AI Service — all calls to the external Analysis AI API go through here.
 
 import logging
 import requests
+import json
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -228,6 +229,82 @@ def generate_live_insight(transcript: str) -> str:
     if result:
         return result.get("insight", "No insight generated.")
     return "Live insights are not available right now."
+
+
+def generate_emr_pdf(
+    conversation: str,
+    report_summaries: list,
+    patient_id: str,
+    patient_name: str,
+    doctor_id: str,
+    doctor_name: str,
+    emr_content: dict,
+) -> bytes | None:
+    """
+    Calls the external AI service to generate a finalized EMR PDF document.
+
+    Why: Produces a downloadable, shareable clinical record after doctor approval.
+    Where: Called by `emr.py`: `approve_emr` after the EMR is signed off.
+
+    Args:
+        conversation (str): Full session transcript text.
+        report_summaries (list): Summary strings from shared documents.
+        patient_id (str): UUID of the patient.
+        patient_name (str): Full name of the patient.
+        doctor_id (str): UUID of the doctor.
+        doctor_name (str): Full name of the doctor.
+        emr_content (dict): The approved EMR fields.
+
+    Returns:
+        bytes | None: Raw PDF file bytes if successful, else None.
+    """
+    import time
+    start_time = time.time()
+    try:
+        url = f"{BASE_URL}/ai/generate-emr-pdf"
+        
+        # Map our DB keys to the external API's expected keys
+        # The API specifically needs 'history_of_present_illness' and 'plan' (as a list)
+        plan_raw = emr_content.get("treatment_plan") or ""
+        plan_list = [p.strip().replace("• ", "") for p in plan_raw.split("\n") if p.strip()] if isinstance(plan_raw, str) else (plan_raw if isinstance(plan_raw, list) else [])
+
+        payload = {
+            "conversation": conversation,
+            "report_summaries": report_summaries,
+            "patient_id": patient_id,
+            "patient_name": patient_name,
+            "doctor_id": doctor_id,
+            "doctor_name": doctor_name,
+            "chief_complaint": emr_content.get("chief_complaint") or "Unknown",
+            "history_of_present_illness": emr_content.get("history_present_illness") or "Not recorded.",
+            "assessment": emr_content.get("assessment") or "Not recorded.",
+            "plan": plan_list,
+            "diagnoses": emr_content.get("diagnoses") or [],
+            "physical_exam": emr_content.get("physical_examination") or "Not recorded.",
+            "past_medical_history": emr_content.get("past_medical_history") or [],
+            "medications": emr_content.get("medications") or [],
+            "allergies": emr_content.get("allergies") or [],
+        }
+        
+        # Log payload size for debugging
+        payload_json = json.dumps(payload)
+        payload_size = len(payload_json)
+        print(f"[AI_SERVICE] POST {url} | Payload size: {payload_size/1024:.2f} KB | Fields: {list(payload.keys())}")
+        
+        resp = requests.post(url, json=payload, timeout=120)
+        
+        duration = time.time() - start_time
+        print(f"[AI_SERVICE] PDF response ({resp.status_code}) in {duration:.2f}s | content-type: {resp.headers.get('content-type', 'unknown')}")
+        
+        if resp.status_code == 200:
+            return resp.content  # raw PDF bytes
+        else:
+            print(f"[AI_SERVICE] PDF generation error ({resp.status_code}): {resp.text[:500]}")
+            return None
+    except Exception as e:
+        duration = time.time() - start_time
+        print(f"[AI_SERVICE] PDF generation failed after {duration:.2f}s: {e}")
+        return None
 
 
 def analyze_lab_report(pdf_url: str, patient_id: str, patient_name: str, report_type: str) -> dict | None:

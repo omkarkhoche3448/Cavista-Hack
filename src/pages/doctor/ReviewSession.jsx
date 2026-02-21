@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth";
-import { getEMRDrafts, getPatientSummary, approveEMR } from "@/services/emrService";
+import { useWebSocket } from "@/context/WebSocketContext";
+import { getEMRDrafts, getPatientSummary, approveEMR, getEMRPdfUrl } from "@/services/emrService";
 import { getSession } from "@/services/sessionService";
 import { toast } from "sonner";
 import {
@@ -19,6 +20,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
   X,
+  Download,
   PenLine,
   Lock,
   Undo2,
@@ -35,6 +37,7 @@ export default function PostSessionReview() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { session: authSession } = useAuth();
+  const { subscribe } = useWebSocket();
   const token = authSession?.access_token;
 
   const [emrDraft, setEmrDraft] = useState(null);
@@ -48,6 +51,10 @@ export default function PostSessionReview() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const isApproved = emrDraft?.status === "approved";
+
+  // PDF download state
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   // Editable fields state
   const [editFields, setEditFields] = useState({});
@@ -64,6 +71,23 @@ export default function PostSessionReview() {
     { key: "treatment_plan", label: "Treatment Plan", icon: <CheckCircle2 className="w-4 h-4" />, rows: 3 },
     { key: "follow_up_plan", label: "Follow-Up Plan", icon: <Clock className="w-4 h-4" />, rows: 2 },
   ];
+
+  // Listen for PDF ready event
+  useEffect(() => {
+    if (!sessionId || !subscribe) return;
+
+    const unsub = subscribe("EMR_PDF_READY", (data) => {
+      if (data.session_id === sessionId) {
+        toast.success("EMR PDF is ready!", {
+          description: "The finalized document is now available for download.",
+        });
+        // We don't have the URL in the event, but we know it's ready now
+        // next time handleDownloadPdf is called, it will fetch the URL
+      }
+    });
+
+    return () => unsub && unsub();
+  }, [sessionId, subscribe]);
 
   // Initialize edit fields when dialog opens
   function openApprovalDialog() {
@@ -139,7 +163,7 @@ export default function PostSessionReview() {
     setIsApproving(true);
     try {
       const edits = changeCount > 0 ? changedFields : null;
-      await approveEMR(token, {
+      const result = await approveEMR(token, {
         draftId: emrDraft.id,
         reviewNotes: reviewNotes.trim() || null,
         edits,
@@ -148,10 +172,9 @@ export default function PostSessionReview() {
       setEmrDraft((prev) => ({ ...prev, ...changedFields, status: "approved" }));
       setShowApprovalDialog(false);
       setReviewNotes("");
-      toast.success("EMR approved and finalized successfully.", {
-        description: changeCount > 0
-          ? `${changeCount} field(s) updated. Session status set to completed.`
-          : "The session status has been updated to completed.",
+
+      toast.success("EMR approved and finalized.", {
+        description: "PDF generation has started in the background. You'll be notified when it's ready.",
       });
     } catch (err) {
       console.error("Approval error:", err);
@@ -160,6 +183,30 @@ export default function PostSessionReview() {
       });
     } finally {
       setIsApproving(false);
+    }
+  }
+
+  // ── Download PDF handler ──
+  async function handleDownloadPdf() {
+    // Use cached URL if we already have one
+    if (pdfUrl) {
+      window.open(pdfUrl, "_blank");
+      return;
+    }
+    setIsDownloadingPdf(true);
+    try {
+      const result = await getEMRPdfUrl(token, sessionId);
+      if (result?.pdf_url) {
+        setPdfUrl(result.pdf_url);
+        window.open(result.pdf_url, "_blank");
+      } else {
+        toast.error("PDF not available.", { description: "The PDF may still be generating. Try again shortly." });
+      }
+    } catch (err) {
+      console.error("PDF download error:", err);
+      toast.error("Failed to fetch PDF.", { description: err.message || "Please try again." });
+    } finally {
+      setIsDownloadingPdf(false);
     }
   }
 
@@ -419,10 +466,22 @@ export default function PostSessionReview() {
             </Button>
 
             {isApproved ? (
-              <Badge className="gap-1.5 px-4 py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-bold text-sm">
-                <Lock className="w-3.5 h-3.5" />
-                EMR Approved
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className="gap-1.5 px-4 py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-bold text-sm">
+                  <Lock className="w-3.5 h-3.5" />
+                  EMR Approved
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                  onClick={handleDownloadPdf}
+                  disabled={isDownloadingPdf}
+                >
+                  {isDownloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  Download PDF
+                </Button>
+              </div>
             ) : (
               <Button
                 size="sm"
@@ -443,16 +502,27 @@ export default function PostSessionReview() {
         <div className="lg:col-span-2 space-y-6">
           {/* Approval banner */}
           {isApproved && (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 animate-in fade-in slide-in-from-top-2 duration-500">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
-                <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 animate-in fade-in slide-in-from-top-2 duration-500">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">EMR Finalized & Signed</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500">
+                    This record has been approved and locked. A final EMR with cryptographic checksum has been created.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">EMR Finalized & Signed</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-500">
-                  This record has been approved and locked. A final EMR with cryptographic checksum has been created.
-                </p>
-              </div>
+              <Button
+                size="sm"
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 flex-shrink-0"
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+              >
+                {isDownloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Download PDF
+              </Button>
             </div>
           )}
 

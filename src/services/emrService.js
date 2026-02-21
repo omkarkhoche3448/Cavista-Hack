@@ -82,6 +82,10 @@ export async function getInsights(token, sessionId) {
   return authFetch(`${EMR_API}/insights/${sessionId}`, {}, token);
 }
 
+export async function getEMRPdfUrl(token, sessionId) {
+  return authFetch(`${EMR_API}/pdf/${sessionId}`, {}, token);
+}
+
 export async function getNotifications(token) {
   return authFetch(`${EMR_API}/notifications`, {}, token);
 }
