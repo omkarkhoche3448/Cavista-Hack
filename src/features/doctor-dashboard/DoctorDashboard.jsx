@@ -197,7 +197,6 @@ const SessionCard = ({ session, onClick }) => (
 
 export default function DoctorDashboard() {
   const { profile } = useAuth();
-  const [showStartSession, setShowStartSession] = useState(false);
   const [showPatientForm, setShowPatientForm] = useState(false);
   const [sessions] = useState([
     {
