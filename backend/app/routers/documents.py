@@ -214,16 +214,18 @@ async def share_documents(
             # Already shared — skip
             shared.append(doc.data)
 
-    # Notify doctor via WebSocket
+    # Notify both parties via WebSocket
     doctor_id = session.data["doctor_id"]
-    await manager.send_to_user(doctor_id, "FILE_SHARED", {
+    ws_payload = {
         "session_id": body.session_id,
         "patient_id": current_user["id"],
         "documents": [
             {"id": d["id"], "title": d["title"], "file_name": d["file_name"], "type": d["document_type"]}
             for d in shared
         ],
-    })
+    }
+    await manager.send_to_user(doctor_id, "FILE_SHARED", ws_payload)
+    await manager.send_to_user(current_user["id"], "FILE_SHARED", ws_payload)
 
     # Trigger AI document analysis for each shared doc
     for doc in shared:

@@ -58,24 +58,34 @@ export default function DoctorDashboard() {
     fetchSessions();
   }, [fetchSessions]);
 
-  // Listen for real-time session updates
+  // Listen for real-time session updates — direct state mutations, no refetch
   useEffect(() => {
     const unsub1 = subscribe("SESSION_ACCEPTED", (data) => {
       setSessions((prev) =>
-        prev.map((s) => (s.id === data.session_id ? { ...s, status: "accepted" } : s))
+        prev.map((s) => s.id === data.session_id ? { ...s, status: "accepted" } : s)
       );
     });
     const unsub2 = subscribe("SESSION_REJECTED", (data) => {
       setSessions((prev) =>
-        prev.map((s) => (s.id === data.session_id ? { ...s, status: "rejected" } : s))
+        prev.map((s) => s.id === data.session_id ? { ...s, status: "rejected" } : s)
       );
     });
     const unsub3 = subscribe("EMR_DRAFT_READY", (data) => {
       setSessions((prev) =>
-        prev.map((s) => (s.id === data.session_id ? { ...s, status: "processing" } : s))
+        prev.map((s) => s.id === data.session_id ? { ...s, status: "processing" } : s)
       );
     });
-    return () => { unsub1(); unsub2(); unsub3(); };
+    const unsub4 = subscribe("SESSION_ENDED", (data) => {
+      setSessions((prev) =>
+        prev.map((s) => s.id === data.session_id ? { ...s, status: data.status || "processing" } : s)
+      );
+    });
+    const unsub5 = subscribe("SESSION_STARTED", (data) => {
+      setSessions((prev) =>
+        prev.map((s) => s.id === data.session_id ? { ...s, status: "active" } : s)
+      );
+    });
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); };
   }, [subscribe]);
 
   async function handleStartSession(sessionId) {

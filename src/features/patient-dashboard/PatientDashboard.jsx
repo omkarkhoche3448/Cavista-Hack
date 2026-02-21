@@ -67,15 +67,56 @@ export default function PatientDashboard() {
     fetchData();
   }, [fetchData]);
 
-  // Listen for real-time session requests
+  // Listen for real-time events — direct state mutations, no refetch
   useEffect(() => {
     const unsub1 = subscribe("SESSION_REQUESTED", (data) => {
-      // Refresh the sessions list
-      fetchData();
+      // New session request from doctor — add it to sessions and pending
+      if (data.session) {
+        setSessions((prev) => {
+          if (prev.some((s) => s.id === data.session.id)) return prev;
+          return [data.session, ...prev];
+        });
+        setPendingRequests((prev) => {
+          if (prev.some((s) => s.id === data.session.id)) return prev;
+          return [data.session, ...prev];
+        });
+      } else {
+        // fallback: refetch if we don't have full session data
+        fetchData();
+      }
     });
-    const unsub2 = subscribe("SESSION_ENDED", () => fetchData());
-    const unsub3 = subscribe("NOTIFICATION", () => fetchData());
-    return () => { unsub1(); unsub2(); unsub3(); };
+    const unsub2 = subscribe("SESSION_ENDED", (data) => {
+      setSessions((prev) =>
+        prev.map((s) => s.id === data.session_id ? { ...s, status: data.status || "processing" } : s)
+      );
+    });
+    const unsub3 = subscribe("SESSION_STARTED", (data) => {
+      setSessions((prev) =>
+        prev.map((s) => s.id === data.session_id ? { ...s, status: "active" } : s)
+      );
+      setPendingRequests((prev) => prev.filter((s) => s.id !== data.session_id));
+    });
+    const unsub4 = subscribe("SESSION_ACCEPTED", (data) => {
+      setSessions((prev) =>
+        prev.map((s) => s.id === data.session_id ? { ...s, status: "accepted" } : s)
+      );
+      setPendingRequests((prev) => prev.filter((s) => s.id !== data.session_id));
+    });
+    const unsub5 = subscribe("SESSION_REJECTED", (data) => {
+      setSessions((prev) =>
+        prev.map((s) => s.id === data.session_id ? { ...s, status: "rejected" } : s)
+      );
+      setPendingRequests((prev) => prev.filter((s) => s.id !== data.session_id));
+    });
+    const unsub6 = subscribe("FILE_SHARED", (data) => {
+      if (data.documents) {
+        setDocuments((prev) => [
+          ...data.documents.filter((d) => !prev.some((p) => p.id === d.id)),
+          ...prev,
+        ]);
+      }
+    });
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6(); };
   }, [subscribe, fetchData]);
 
   async function handleRespond(sessionId, action, reason) {

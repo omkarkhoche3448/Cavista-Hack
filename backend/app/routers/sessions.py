@@ -167,7 +167,7 @@ async def handle_ws_event(user_id: str, event: str, data: dict, websocket: WebSo
 # ─── REST Endpoints ───
 
 @router.post("", response_model=SessionResponse)
-def create_session(
+async def create_session(
     body: CreateSessionRequest,
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
@@ -232,26 +232,22 @@ def create_session(
     except Exception as e:
         logger.warning(f"Failed to persist notification: {e}")
 
-    # Send real-time WS notification to patient
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(manager.send_to_user(patient_id, "SESSION_REQUESTED", {
-                "session_id": session["id"],
-                "doctor_id": doctor_id,
-                "doctor_name": f"Dr. {current_user['first_name']} {current_user['last_name']}",
-                "doctor_email": current_user["email"],
-                "chief_complaint": body.chief_complaint,
-            }))
-    except Exception as e:
-        logger.warning(f"Could not send WS notification: {e}")
-
-    # Build response
+    # Build response before sending WS (so we have the enriched data)
     session["doctor_name"] = f"Dr. {current_user['first_name']} {current_user['last_name']}"
     session["patient_name"] = f"{patient.data['first_name']} {patient.data['last_name']}"
     session["doctor_email"] = current_user["email"]
     session["patient_email"] = patient.data["email"]
+
+    # Send real-time WS notification to patient
+    ws_payload = {
+        "session_id": session["id"],
+        "session": session,
+        "doctor_id": doctor_id,
+        "doctor_name": session["doctor_name"],
+        "doctor_email": current_user["email"],
+        "chief_complaint": body.chief_complaint,
+    }
+    await manager.send_to_user(patient_id, "SESSION_REQUESTED", ws_payload)
 
     return session
 
@@ -303,12 +299,16 @@ async def respond_to_session(
 
     # Notify doctor via WebSocket
     doctor_id = session.data["doctor_id"]
-    await manager.send_to_user(doctor_id, ws_event, {
+    ws_payload = {
         "session_id": body.session_id,
         "patient_id": current_user["id"],
         "patient_name": f"{current_user['first_name']} {current_user['last_name']}",
+        "new_status": new_status,
         "reason": body.reason,
-    })
+    }
+    await manager.send_to_user(doctor_id, ws_event, ws_payload)
+    # Also notify patient so their UI updates
+    await manager.send_to_user(current_user["id"], ws_event, ws_payload)
 
     return {"status": new_status, "session_id": body.session_id}
 
@@ -346,11 +346,11 @@ async def start_session(
         "changed_by": current_user["id"],
     }).execute()
 
-    # Notify patient
+    # Notify both parties
     patient_id = session.data["patient_id"]
-    await manager.send_to_user(patient_id, "SESSION_STARTED", {
-        "session_id": session_id,
-    })
+    ws_payload = {"session_id": session_id, "status": "active"}
+    await manager.send_to_user(patient_id, "SESSION_STARTED", ws_payload)
+    await manager.send_to_user(current_user["id"], "SESSION_STARTED", ws_payload)
 
     return {"status": "active", "session_id": session_id}
 
@@ -393,9 +393,9 @@ async def end_session(
     }).execute()
 
     patient_id = session.data["patient_id"]
-    await manager.send_to_user(patient_id, "SESSION_ENDED", {
-        "session_id": body.session_id,
-    })
+    ws_payload = {"session_id": body.session_id, "status": "processing"}
+    await manager.send_to_user(patient_id, "SESSION_ENDED", ws_payload)
+    await manager.send_to_user(current_user["id"], "SESSION_ENDED", ws_payload)
 
     # ── AI Pipeline ──
     try:

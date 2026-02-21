@@ -8,8 +8,8 @@ import {
   RoleRoute,
 } from "@/features/auth";
 import RoleRedirect from "./features/auth/RoleRedirect";
-import { DoctorDashboard } from "@/features/doctor-dashboard";
-import { PatientDashboard } from "@/features/patient-dashboard";
+import { DoctorDashboard, SessionPage, PostSessionReview } from "@/features/doctor-dashboard";
+import { PatientDashboard, PatientSessionPage } from "@/features/patient-dashboard";
 
 export default function AppRouter() {
   return (
@@ -36,6 +36,39 @@ export default function AppRouter() {
           <ProtectedRoute>
             <RoleRoute allowedRole="patient">
               <PatientDashboard />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/doctor/session/:sessionId"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRole="doctor">
+              <SessionPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/doctor/review/:sessionId"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRole="doctor">
+              <PostSessionReview />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/patient/session/:sessionId"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRole="patient">
+              <PatientSessionPage />
             </RoleRoute>
           </ProtectedRoute>
         }

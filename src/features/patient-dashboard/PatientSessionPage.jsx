@@ -130,33 +130,50 @@ export default function PatientSessionPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/patient/dashboard")}
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            Session with {sessionData.doctor_name}
-            <Badge
-              variant={
-                sessionData.status === "active"
-                  ? "success"
-                  : sessionData.status === "accepted"
-                  ? "info"
-                  : "secondary"
-              }
-            >
-              {sessionData.status}
-            </Badge>
-          </h1>
-          <p className="text-muted-foreground">
-            {sessionData.chief_complaint || "General consultation"}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/patient/dashboard")}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              Session with {sessionData.doctor_name}
+              <Badge
+                variant={
+                  sessionData.status === "active"
+                    ? "success"
+                    : sessionData.status === "accepted"
+                    ? "info"
+                    : "secondary"
+                }
+              >
+                {sessionData.status}
+              </Badge>
+            </h1>
+            <p className="text-muted-foreground">
+              {sessionData.chief_complaint || "General consultation"}
+            </p>
+          </div>
         </div>
+
+        {!isEnded && (
+          <Button
+            variant="destructive"
+            className="gap-2"
+            onClick={() => {
+              if (confirm("Are you sure you want to leave this session?")) {
+                navigate("/patient/dashboard");
+              }
+            }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Leave Session
+          </Button>
+        )}
       </div>
 
       {isEnded && (
