@@ -40,6 +40,12 @@ export async function getSession(token, sessionId) {
   return authFetch(`${SESSIONS_API}/${sessionId}`, {}, token);
 }
 
+export async function getAllSessions(token) {
+  return authFetch(`${SESSIONS_API}`, {
+    method: "POST",
+  }, token);
+}
+
 export async function respondToSession(token, { sessionId, action, reason }) {
   return authFetch(`${SESSIONS_API}/respond`, {
     method: "POST",
