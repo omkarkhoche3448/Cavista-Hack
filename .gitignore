@@ -27,3 +27,5 @@ CLAUDE.md
 .claude/
 PLAN.md
 doc/
+
+venv/
