@@ -57,3 +57,7 @@ export async function shareDocuments(token, { sessionId, documentIds }) {
 export async function getSessionDocuments(token, sessionId) {
   return authFetch(`${DOCUMENTS_API}/session/${sessionId}`, {}, token);
 }
+
+export async function getDocumentAnalysis(token, documentId) {
+  return authFetch(`${DOCUMENTS_API}/${documentId}/analysis`, {}, token);
+}

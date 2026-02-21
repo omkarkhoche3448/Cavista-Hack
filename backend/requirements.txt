@@ -9,6 +9,8 @@ python-dotenv
 python-multipart
 # Real-time / async
 websockets
+# AWS
+boto3
 # Supabase
 supabase
 python-jose[cryptography]

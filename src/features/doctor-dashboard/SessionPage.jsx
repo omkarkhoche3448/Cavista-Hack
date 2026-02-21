@@ -17,6 +17,7 @@ import {
   ChevronRight,
   User,
   Stethoscope,
+  Activity,
 } from "lucide-react";
 import { getSession, endSession, uploadRecording } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
@@ -303,13 +304,59 @@ export default function SessionPage() {
                     <div className="p-2 rounded-lg bg-primary/5 text-primary group-hover:bg-primary/10 transition-colors">
                       <FileText className="w-4 h-4" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-xs truncate group-hover:text-primary transition-colors">{doc.title || doc.file_name}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="font-bold text-xs truncate group-hover:text-primary transition-colors">{doc.title || doc.file_name}</p>
+                        {doc.storage_url && (
+                          <a href={doc.storage_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex-shrink-0">View</a>
+                        )}
+                      </div>
                       <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-tighter font-semibold">
                         {doc.type || doc.document_type || "General Document"}
                       </p>
                     </div>
                   </div>
+                  {doc.analysis_result && (
+                    <div className="mt-2 p-2 rounded-lg bg-primary/5 border border-primary/20 space-y-1.5 text-xs">
+                      <p className="font-semibold text-primary text-[10px] uppercase tracking-wider">Lab Analysis</p>
+                      {doc.analysis_result.summary && (
+                        <p className="text-muted-foreground">{doc.analysis_result.summary}</p>
+                      )}
+                      {doc.analysis_result.key_findings?.length > 0 && (
+                        <div>
+                          <p className="font-medium mb-0.5">Key Findings:</p>
+                          {doc.analysis_result.key_findings.map((f, fi) => (
+                            <div key={fi} className="flex items-start gap-1 ml-1">
+                              <ChevronRight className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                              <span className="text-muted-foreground">{typeof f === "string" ? f : f.finding || f.value || JSON.stringify(f)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {doc.analysis_result.recommendations?.length > 0 && (
+                        <div>
+                          <p className="font-medium mb-0.5">Recommendations:</p>
+                          {doc.analysis_result.recommendations.map((r, ri) => (
+                            <div key={ri} className="flex items-start gap-1 ml-1">
+                              <ChevronRight className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span className="text-muted-foreground">{typeof r === "string" ? r : r.recommendation || JSON.stringify(r)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {doc.analysis_result.risk_flags?.length > 0 && (
+                        <div>
+                          <p className="font-medium mb-0.5">Risk Flags:</p>
+                          {doc.analysis_result.risk_flags.map((flag, fi) => (
+                            <div key={fi} className="flex items-center gap-1 ml-1">
+                              <AlertTriangle className="w-3 h-3 text-yellow-500 flex-shrink-0" />
+                              <span className="text-muted-foreground">{typeof flag === "string" ? flag : flag.flag || JSON.stringify(flag)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -337,7 +384,7 @@ export default function SessionPage() {
                     {(ins.risk_flags || ins.insight?.risk_flags)?.map((flag, fi) => (
                       <div key={fi} className="flex items-start gap-2 p-1.5 rounded-lg bg-destructive/5 border border-destructive/10 animate-in fade-in duration-300">
                         <AlertTriangle className="w-3 h-3 text-destructive mt-0.5" />
-                        <span className="text-[10px] text-destructive font-bold uppercase tracking-tight">{flag.flag}</span>
+                        <span className="text-[10px] text-destructive font-bold uppercase tracking-tight">{typeof flag === "string" ? flag : flag.flag}</span>
                       </div>
                     ))}
                   </div>

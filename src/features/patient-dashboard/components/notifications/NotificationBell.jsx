@@ -22,6 +22,10 @@ export default function NotificationBell() {
     clearNotification(id);
   }
 
+  function markAllAsRead() {
+    notifications.forEach((n) => clearNotification(n.id));
+  }
+
   function handleNotificationClick(notification) {
     if (notification.type === "session_request") {
       setSessionDialog(notification);

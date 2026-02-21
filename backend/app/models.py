@@ -160,6 +160,7 @@ class DocumentResponse(BaseModel):
     file_mime_type: str
     file_size_bytes: Optional[int] = None
     storage_url: Optional[str] = None
+    analysis_result: Optional[Any] = None
     created_at: datetime
 
 
