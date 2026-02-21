@@ -44,7 +44,7 @@ def _call(endpoint: str, payload: dict):
         return None
 
 
-def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_url: str = None, transcript: str = None, patient_name: str = None, patient_gender: str = None) -> dict:
+def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_url: str = None, transcript: str = None, patient_name: str = None, patient_gender: str = None, patient_age: int = None, doctor_id: str = None, doctor_name: str = None, patient_id: str = None) -> dict:
     """
     Requests the external AI to generate a structured EMR draft from session data.
     
@@ -53,25 +53,33 @@ def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_
     
     Args:
         chief_complaint (str): The patient's primary complaint.
-        document_insights (list, optional): Summaries of shared medical documents.
+        document_insights (list, optional): Flattened summary strings of shared medical documents.
         audio_url (str, optional): Link to the session recording.
         transcript (str, optional): Raw text transcript as fallback context.
         patient_name (str, optional): Full name of the patient.
         patient_gender (str, optional): Gender of the patient.
+        patient_age (int, optional): Age of the patient in years.
+        doctor_id (str, optional): UUID of the attending doctor.
+        doctor_name (str, optional): Full name of the doctor.
+        patient_id (str, optional): UUID of the patient.
         
     Returns:
         dict: A structured EMR object with HPI, Assessment, Plan, etc.
     """
     # Prefer actual transcript text over audio URL — the AI needs readable text
     conversation = transcript or audio_url or ""
-    print(f"[AI_SERVICE] generate_emr_draft: conversation length={len(conversation)}, using={'transcript' if transcript else 'audio_url' if audio_url else 'empty'}")
+    print(f"[AI_SERVICE] generate_emr_draft: conversation length={len(conversation)}, using={'transcript' if transcript else 'audio_url' if audio_url else 'empty'}, report_summaries={len(document_insights or [])}")
     
     payload = {
         "conversation": conversation,
         "chief_complaint": chief_complaint,
         "report_summaries": document_insights or [],
-        "patient_name": patient_name,
-        "patient_gender": patient_gender,
+        "patient_id": patient_id or "",
+        "patient_name": patient_name or "",
+        "patient_gender": patient_gender or "",
+        "patient_age": patient_age,
+        "doctor_id": doctor_id or "",
+        "doctor_name": doctor_name or "",
     }
     result = _call("/ai/generate-emr", payload)
     

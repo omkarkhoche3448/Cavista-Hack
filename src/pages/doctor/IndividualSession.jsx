@@ -156,12 +156,16 @@ export default function IndividualSession() {
 
     const unsub2 = subscribe("FILE_SHARED", (data) => {
       if (data.session_id === sessionId) {
-        setDocuments((prev) => [
-          ...prev,
-          ...(data.documents || []).filter(
-            (d) => !prev.some((p) => p.id === d.id)
-          ),
-        ]);
+        const newDocs = (data.documents || []).filter(
+          (d) => !documents.some((p) => p.id === d.id)
+        );
+        if (newDocs.length > 0) {
+          setDocuments((prev) => [...prev, ...newDocs.filter((d) => !prev.some((p) => p.id === d.id))]);
+          toast.info(
+            `Patient shared ${newDocs.length} file${newDocs.length > 1 ? "s" : ""} — check Clinical Registry`,
+            { icon: "📄", duration: 5000 }
+          );
+        }
       }
     });
 
@@ -272,7 +276,7 @@ export default function IndividualSession() {
                       {doc.analysis_result.summary && (
                         <p className="text-muted-foreground">{doc.analysis_result.summary}</p>
                       )}
-                      {doc.analysis_result.key_findings?.length > 0 && (
+                      {Array.isArray(doc.analysis_result.key_findings) && doc.analysis_result.key_findings.length > 0 && (
                         <div>
                           <p className="font-medium mb-0.5">Key Findings:</p>
                           {doc.analysis_result.key_findings.map((f, fi) => (
@@ -283,7 +287,7 @@ export default function IndividualSession() {
                           ))}
                         </div>
                       )}
-                      {doc.analysis_result.recommendations?.length > 0 && (
+                      {Array.isArray(doc.analysis_result.recommendations) && doc.analysis_result.recommendations.length > 0 && (
                         <div>
                           <p className="font-medium mb-0.5">Recommendations:</p>
                           {doc.analysis_result.recommendations.map((r, ri) => (
@@ -294,7 +298,7 @@ export default function IndividualSession() {
                           ))}
                         </div>
                       )}
-                      {doc.analysis_result.risk_flags?.length > 0 && (
+                      {Array.isArray(doc.analysis_result.risk_flags) && doc.analysis_result.risk_flags.length > 0 && (
                         <div>
                           <p className="font-medium mb-0.5">Risk Flags:</p>
                           {doc.analysis_result.risk_flags.map((flag, fi) => (
