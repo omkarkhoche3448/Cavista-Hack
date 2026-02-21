@@ -235,6 +235,7 @@ export default function DoctorDashboard() {
             <Button
               variant="outline"
               className="rounded-full px-6 border-primary/20 hover:bg-primary hover:text-white transition-all duration-300 font-bold"
+              onClick={() => navigate("/doctor/sessions")}
             >
               <CalendarDays className="w-4 h-4 mr-2" />
               Sessions

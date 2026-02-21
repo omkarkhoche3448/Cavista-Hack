@@ -14,7 +14,7 @@ import { PatientDashboard, PatientSessionPage } from "@/features/patient-dashboa
 import PatientDashboardLayout from "@/features/patient-dashboard/components/PatientDashboardLayout";
 import MyHealthPage from "@/features/patient-dashboard/components/health/MyHealthPage";
 import MyDocumentsPage from "@/features/patient-dashboard/components/documents/MyDocumentsPage";
-
+import DoctorSessions from "@/pages/doctor/sessions.jsx";
 export default function AppRouter() {
   return (
     <Routes>
@@ -37,6 +37,17 @@ export default function AppRouter() {
           </DefaultLayout>
         }
       />
+      <Route 
+      path="/doctor/sessions" 
+      element={
+        <DefaultLayout>
+          <ProtectedRoute>
+            <RoleRoute allowedRole="doctor">
+              <DoctorSessions />
+            </RoleRoute>
+          </ProtectedRoute>
+        </DefaultLayout>
+      } /> 
 
       {/* Patient dashboard — nested with sidebar */}
       <Route
