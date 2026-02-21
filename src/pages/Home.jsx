@@ -18,19 +18,19 @@ const FeatureCard = ({ icon: Icon, title, description, delay }) => (
 
 const ProblemCard = ({ icon: Icon, title, description, delay }) => (
   <div
-    className="rounded-lg bg-destructive/5 border border-destructive/20 p-4 animate-in fade-in-left flex gap-3 transition-all duration-500 hover:border-destructive/50 hover:bg-destructive/10"
+    className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 transition-all duration-500 hover:shadow-xl hover:border-primary hover:-translate-y-1 animate-in fade-in-up"
     style={{ animationDelay: `${delay}ms`, animationDuration: '600ms' }}
   >
-    <div className="flex-shrink-0 transition-transform duration-500 group-hover:scale-110">
-      <Icon className="h-5 w-5 text-destructive mt-0.5" />
-    </div>
-    <div>
-      <p className="font-semibold text-foreground mb-1">{title}</p>
-      <p className="text-sm text-muted-foreground">{description}</p>
+    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+    <div className="relative">
+      <div className="mb-4 inline-block rounded-lg bg-primary/10 p-3 text-primary group-hover:scale-125 group-hover:bg-primary/20 transition-all duration-500">
+        <Icon className="h-6 w-6" />
+      </div>
+      <h3 className="mb-2 text-lg font-semibold text-foreground group-hover:text-primary transition-colors duration-300">{title}</h3>
+      <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/80 transition-colors duration-300">{description}</p>
     </div>
   </div>
 );
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
