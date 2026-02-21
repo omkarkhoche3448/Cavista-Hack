@@ -18,7 +18,13 @@ import {
   Wifi,
   WifiOff,
   Eye,
+  Search,
+  Plus,
+  Activity,
+  User,
+  ShieldCheck,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { listSessions, respondToSession } from "@/services/sessionService";
 import { listDocuments, uploadDocument } from "@/services/documentService";
 import FileUploadModal from "./FileUploadModal";
@@ -167,27 +173,43 @@ export default function PatientDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Welcome, {profile?.first_name}</h1>
-          <p className="text-muted-foreground mt-1 flex items-center gap-2">
-            Your health overview
-            {isConnected ? (
-              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                <Wifi className="w-3 h-3" /> Live
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <WifiOff className="w-3 h-3" /> Offline
-              </span>
-            )}
-          </p>
+      {/* Premium Welcome Header */}
+      <div className="relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-secondary/5 border border-primary/20 animate-in fade-in zoom-in duration-700">
+        <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 -mr-8 -mt-8">
+          <ShieldCheck className="w-48 h-48 text-primary" />
         </div>
-        <Button onClick={() => setShowUpload(true)} className="gap-2">
-          <Upload className="w-4 h-4" />
-          Upload Document
-        </Button>
+
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+              Welcome back, <span className="text-primary">{profile?.first_name}</span>
+            </h1>
+            <div className="flex items-center gap-3">
+              <p className="text-muted-foreground font-medium">Your personalized health dashboard</p>
+              <div className="h-4 w-[1px] bg-border hidden sm:block" />
+              {isConnected ? (
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 animate-pulse">
+                  <Activity className="w-3 h-3" /> Live Support
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 gap-1">
+                  <WifiOff className="w-3 h-3" /> Offline Mode
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setShowUpload(true)}
+              size="lg"
+              className="rounded-full px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300 gap-2 font-bold"
+            >
+              <Plus className="w-5 h-5" />
+              Upload Records
+            </Button>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -213,38 +235,63 @@ export default function PatientDashboard() {
         </div>
       )}
 
-      {/* Stats */}
+      {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Medical Records</CardTitle>
-            <FileText className="w-5 h-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{documents.length}</p>
-            <p className="text-xs text-muted-foreground">Uploaded documents</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
-            <CalendarDays className="w-5 h-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{activeSessions.length}</p>
-            <p className="text-xs text-muted-foreground">Ongoing</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Visit Summaries</CardTitle>
-            <ClipboardList className="w-5 h-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{completedSessions.length}</p>
-            <p className="text-xs text-muted-foreground">Completed visits</p>
-          </CardContent>
-        </Card>
+        {loading ? (
+          [1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-24 h-4 bg-muted rounded" />
+                  <div className="w-8 h-8 bg-muted rounded-full" />
+                </div>
+                <div className="w-16 h-8 bg-muted rounded mb-2" />
+                <div className="w-32 h-3 bg-muted rounded" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <>
+            <Card className="hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-semibold text-muted-foreground">Medical Records</CardTitle>
+                <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                  <FileText className="w-4 h-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{documents.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">Files securely stored</p>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-semibold text-muted-foreground">Active Sessions</CardTitle>
+                <div className="p-2 rounded-lg bg-green-500/10 text-green-600 group-hover:scale-110 transition-transform">
+                  <Activity className="w-4 h-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{activeSessions.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">Live consultations</p>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-semibold text-muted-foreground">Visit Summaries</CardTitle>
+                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 group-hover:scale-110 transition-transform">
+                  <ClipboardList className="w-4 h-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{completedSessions.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">AI-processed reviews</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Active Sessions */}
@@ -279,32 +326,55 @@ export default function PatientDashboard() {
         </div>
       )}
 
-      {/* Documents */}
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">My Documents</h2>
-        {documents.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No documents uploaded yet. Upload your medical records to get started.</p>
+      {/* Documents - Refined Grid */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold tracking-tight">Medical Documents</h2>
+          {documents.length > 0 && (
+            <p className="text-sm font-medium text-muted-foreground">{documents.length} files found</p>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-20 w-full rounded-2xl" />
+            ))}
+          </div>
+        ) : documents.length === 0 ? (
+          <Card className="border-dashed border-2 bg-muted/30">
+            <CardContent className="py-16 text-center">
+              <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                <FileText className="w-8 h-8 text-muted-foreground/40" />
+              </div>
+              <h3 className="text-lg font-semibold">No documents yet</h3>
+              <p className="text-muted-foreground max-w-xs mx-auto mt-1 mb-6">
+                Keep all your health records organized and accessible in one secure place.
+              </p>
+              <Button onClick={() => setShowUpload(true)} variant="outline" className="rounded-full px-8">
+                Start Uploading
+              </Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {documents.map((doc) => (
-              <Card key={doc.id}>
-                <CardContent className="py-3">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-primary flex-shrink-0" />
+              <Card key={doc.id} className="group hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-pointer overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-colors" />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-primary/5 text-primary group-hover:bg-primary/10 transition-colors">
+                      <FileText className="w-6 h-6" />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{doc.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {doc.document_type} &middot; {doc.file_name}
+                      <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{doc.title}</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-0.5">
+                        {doc.document_type} &middot; {new Date(doc.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-xs flex-shrink-0">
-                      {doc.document_type}
-                    </Badge>
+                    <Button variant="ghost" size="icon" className="group-hover:text-primary rounded-full">
+                      <Eye className="w-4 h-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

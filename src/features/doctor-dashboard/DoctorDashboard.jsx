@@ -19,7 +19,11 @@ import {
   Loader2,
   Wifi,
   WifiOff,
+  Search,
+  LayoutDashboard,
+  Settings,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { listSessions, startSession } from "@/services/sessionService";
 import CreateSessionModal from "./CreateSessionModal";
@@ -252,8 +256,7 @@ export default function DoctorDashboard() {
       {/* Start New Session CTA */}
       <div className="animate-in fade-in-up duration-700 delay-100">
         <div className="relative overflow-hidden">
-          <Card className="relative overflow-hidden bg-background border-2 border-dashed border-primary/40 hover:border-primary hover:shadow-2xl hover:shadow-primary/25 hover:bg-primary/2 transition-all duration-700 group transform hover:scale-[1.01]">
-            {/* Background pattern */}
+          <Card className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 border-2 border-dashed border-primary/40 hover:border-primary hover:shadow-2xl hover:shadow-primary/25 transition-all duration-700 group transform hover:scale-[1.01]">
             <div className="absolute inset-0 opacity-5 pointer-events-none">
               <div className="w-full h-full" style={{
                 backgroundImage: `radial-gradient(circle at 25px 25px, currentColor 2px, transparent 0)`,
@@ -263,80 +266,87 @@ export default function DoctorDashboard() {
 
             <CardContent className="relative p-10 text-center">
               <div className="relative mx-auto mb-8 w-24 h-24">
-                <div className="absolute inset-0 bg-primary rounded-full animate-spin opacity-30" style={{ animationDuration: '4s' }} />
-                <div className="absolute inset-2 bg-background rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                  <Play className="w-10 h-10 text-primary group-hover:animate-pulse" />
+                <div className="absolute inset-0 bg-primary/20 rounded-full animate-spin opacity-30" style={{ animationDuration: '4s' }} />
+                <div className="absolute inset-3 bg-background rounded-full shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                  <Mic className="w-10 h-10 text-primary group-hover:animate-pulse" />
                 </div>
-                <div className="absolute -top-2 left-1/2 w-3 h-3 bg-primary rounded-full animate-ping opacity-60" />
-                <div className="absolute -bottom-2 left-1/2 w-2 h-2 bg-secondary rounded-full animate-pulse opacity-70" />
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-primary/40 rounded-full animate-ping" />
               </div>
 
-              <div className="space-y-4 mb-8">
-                <h3 className="text-3xl font-bold text-primary">Start New Session</h3>
-                <p className="text-muted-foreground text-lg max-w-md mx-auto">
-                  Initialize a new patient consultation with AI-powered voice recording
+              <div className="space-y-4 mb-10">
+                <h3 className="text-4xl font-black tracking-tight text-primary">Start New Session</h3>
+                <p className="text-muted-foreground text-xl max-w-lg mx-auto font-medium">
+                  Initialize a new patient consultation with AI-powered voice recognition
                 </p>
               </div>
 
               <Button
                 onClick={() => setShowModal(true)}
-                className="group/btn relative inline-flex items-center gap-3 px-12 py-5 text-xl font-bold rounded-full bg-primary text-primary-foreground overflow-hidden transition-all duration-700 hover:shadow-2xl hover:shadow-primary/40 active:scale-95 transform hover:-translate-y-1 hover:bg-primary/90"
+                size="lg"
+                className="group/btn relative inline-flex items-center gap-4 px-16 py-8 text-2xl font-black rounded-full shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all duration-500 active:scale-95 transform hover:-translate-y-2"
               >
                 <div className="absolute inset-0 bg-white/10 -skew-x-12 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-1000" />
-                <span className="relative z-10 flex items-center gap-3">
-                  <Mic className="w-6 h-6 group-hover/btn:animate-pulse" />
+                <span className="relative z-10 flex items-center gap-4">
                   Launch Session
-                  <ArrowRight className="w-6 h-6 transition-all duration-500 group-hover/btn:translate-x-2 group-hover/btn:scale-110" />
+                  <ArrowRight className="w-8 h-8 transition-transform duration-500 group-hover/btn:translate-x-2" />
                 </span>
               </Button>
-              <div className="mt-6 text-xs text-muted-foreground/70 animate-pulse">
-                Voice recognition activates automatically upon session start
-              </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Premium Visuals */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in-up duration-700 delay-200">
-        <Card className="group hover:shadow-lg hover:border-primary hover:-translate-y-1 transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
-            <div className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 group-hover:scale-110 transition-transform duration-300">
-              <Activity className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">{activeSessions.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Ready to continue</p>
-          </CardContent>
-        </Card>
+        {loading ? (
+          [1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-32 w-full rounded-3xl" />
+          ))
+        ) : (
+          <>
+            <Card className="group hover:border-green-500/50 hover:shadow-2xl hover:shadow-green-500/10 transition-all duration-500 rounded-3xl overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-bold text-muted-foreground tracking-widest uppercase">Active Sessions</CardTitle>
+                <div className="p-2.5 rounded-2xl bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all duration-300">
+                  <Activity className="w-4 h-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-4xl font-black text-foreground">{activeSessions.length}</p>
+                <p className="text-xs font-semibold text-green-600 mt-1 uppercase tracking-tighter italic">Live connections established</p>
+              </CardContent>
+            </Card>
 
-        <Card className="group hover:shadow-lg hover:border-primary hover:-translate-y-1 transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
-            <div className="p-2 rounded-lg bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400 group-hover:scale-110 transition-transform duration-300">
-              <Clock className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">{pendingSessions.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Awaiting patient response</p>
-          </CardContent>
-        </Card>
+            <Card className="group hover:border-yellow-500/50 hover:shadow-2xl hover:shadow-yellow-500/10 transition-all duration-500 rounded-3xl overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-bold text-muted-foreground tracking-widest uppercase">Pending Requests</CardTitle>
+                <div className="p-2.5 rounded-2xl bg-yellow-50 text-yellow-600 group-hover:bg-yellow-600 group-hover:text-white transition-all duration-300">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-4xl font-black text-foreground">{pendingSessions.length}</p>
+                <p className="text-xs font-semibold text-yellow-600 mt-1 uppercase tracking-tighter italic">Awaiting patient acceptance</p>
+              </CardContent>
+            </Card>
 
-        <Card className="group hover:shadow-lg hover:border-primary hover:-translate-y-1 transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">EMR Generated</CardTitle>
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-300">
-              <FileBarChart className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">{completedSessions.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Completed sessions</p>
-          </CardContent>
-        </Card>
+            <Card className="group hover:border-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 rounded-3xl overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-bold text-muted-foreground tracking-widest uppercase">EMR Generated</CardTitle>
+                <div className="p-2.5 rounded-2xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">
+                  <FileBarChart className="w-4 h-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-4xl font-black text-foreground">{completedSessions.length}</p>
+                <p className="text-xs font-semibold text-purple-600 mt-1 uppercase tracking-tighter italic">Reports finalized by AI</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Active / Accepted Sessions */}
@@ -395,18 +405,23 @@ export default function DoctorDashboard() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
           </div>
         ) : sessions.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-30" />
-              <p>No sessions yet. Click &quot;Launch Session&quot; to get started.</p>
+          <Card className="border-dashed border-2 bg-muted/20">
+            <CardContent className="py-20 text-center">
+              <div className="mx-auto w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">
+                <FileText className="w-10 h-10 text-muted-foreground/30" />
+              </div>
+              <h3 className="text-xl font-bold">No sessions found</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+                You haven&apos;t started any consultations yet. Launch a session to begin real-time charting.
+              </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {sessions.map((session) => (
               <SessionCard
                 key={session.id}
