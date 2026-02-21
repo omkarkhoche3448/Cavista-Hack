@@ -12,6 +12,7 @@ from ..models import (
     DoctorProfileCreate,
     DoctorProfileResponse,
     PatientProfileResponse,
+    OnboardingRequest,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -326,3 +327,81 @@ def get_patient_profile(
         )
 
     return result.data
+@router.post("/onboard", response_model=UserResponse)
+def onboard_patient(
+    body: OnboardingRequest,
+    current_user: dict = Depends(require_role("patient")),
+    supabase: Client = Depends(get_supabase),
+):
+    """
+    Completes patient onboarding by updating both 'users' and 'patient_profiles' tables.
+    Sets user status to 'active'.
+    
+    Why: Mandatory first-time setup for patients to ensure all medical context is available.
+    Where: Called by the Onboarding page in the Frontend.
+    
+    Args:
+        body (OnboardingRequest): Combined patient and user data.
+        current_user (dict): Authenticated patient.
+        supabase (Client): Supabase client.
+        
+    Returns:
+        dict: The updated user record.
+    """
+    # 1. Update public.users
+    user_updates = {
+        "date_of_birth": body.date_of_birth.isoformat(),
+        "gender": body.gender,
+        "phone": body.phone,
+        "status": "active"
+    }
+    
+    user_result = (
+        supabase.table("users")
+        .update(user_updates)
+        .eq("id", current_user["id"])
+        .execute()
+    )
+    
+    if not user_result.data:
+        raise HTTPException(status_code=500, detail="Failed to update user record.")
+
+    # 2. Update/Create public.patient_profiles
+    patient_data = {
+        "user_id": current_user["id"],
+        "blood_type": body.blood_type,
+        "height_cm": body.height_cm,
+        "weight_kg": body.weight_kg,
+        "emergency_contact_name": body.emergency_contact_name,
+        "emergency_contact_phone": body.emergency_contact_phone,
+        "emergency_contact_relation": body.emergency_contact_relation,
+        "insurance_provider": body.insurance_provider,
+        "insurance_policy_number": body.insurance_policy_number,
+    }
+    
+    # Check if profile exists
+    existing = (
+        supabase.table("patient_profiles")
+        .select("id")
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    
+    if existing.data:
+        patient_result = (
+            supabase.table("patient_profiles")
+            .update(patient_data)
+            .eq("user_id", current_user["id"])
+            .execute()
+        )
+    else:
+        patient_result = (
+            supabase.table("patient_profiles")
+            .insert(patient_data)
+            .execute()
+        )
+        
+    if not patient_result.data:
+        raise HTTPException(status_code=500, detail="Failed to create/update patient profile.")
+
+    return user_result.data[0]

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { useWebSocket } from "@/context/WebSocketContext";
@@ -18,6 +19,7 @@ import {
   User,
   Stethoscope,
   Activity,
+  UserCheck,
 } from "lucide-react";
 import { getSession, endSession, transcribeAudio } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
@@ -32,7 +34,6 @@ export default function IndividualSession() {
   const token = authSession?.access_token;
 
   const [sessionData, setSessionData] = useState(null);
-  const [transcriptChunks, setTranscriptChunks] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [insights, setInsights] = useState([]);
   const [aiInsight, setAiInsight] = useState(null);
@@ -40,12 +41,10 @@ export default function IndividualSession() {
   const [isEnding, setIsEnding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [duration, setDuration] = useState(0);
+  const [isPatientJoined, setIsPatientJoined] = useState(false);
 
-  const recognitionRef = useRef(null);
   const isRecordingRef = useRef(false);
-  const chunkIndexRef = useRef(0);
   const sessionStartTimeRef = useRef(Date.now());
-  const transcriptEndRef = useRef(null);
 
   const {
     startRecording: startAudioRecording,
@@ -78,6 +77,13 @@ export default function IndividualSession() {
     load();
   }, [token, sessionId]);
 
+  // Join session room via WS
+  useEffect(() => {
+    if (sessionData && sessionId) {
+      send("JOIN_SESSION", { session_id: sessionId });
+    }
+  }, [sessionData, sessionId, send]);
+
   // Consultation Timer
   useEffect(() => {
     let interval;
@@ -97,15 +103,54 @@ export default function IndividualSession() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handleStartRecording = useCallback(() => {
+    isRecordingRef.current = true;
+    setIsRecording(true);
+    startAudioRecording().catch(err => {
+      console.error("Failed to start audio recording:", err);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+    });
+  }, [startAudioRecording]);
+
+  const handleStopRecording = useCallback(() => {
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    pauseAudioRecording();
+  }, [pauseAudioRecording]);
+
+  async function handleEndSession() {
+    setIsEnding(true);
+    handleStopRecording();
+
+    try {
+      const audioResult = await stopAudioRecording();
+      if (audioResult?.blob) {
+        // Wait for the upload and DB update to complete
+        await transcribeAudio(token, sessionId, audioResult.blob);
+      }
+
+      // Now end the session, which triggers the AI pipeline in the backend
+      await endSession(token, { sessionId, sessionNotes: "" });
+
+      toast.success("Session concluded. Documents are being prepared.");
+      navigate(`/doctor/review/${sessionId}`);
+    } catch (err) {
+      console.error("Failed to initiate end session:", err);
+      setIsEnding(false);
+      toast.error("Failed to conclude session.");
+    }
+  }
+
   // Listen for real-time events
   useEffect(() => {
-    const unsub1 = subscribe("TRANSCRIPT_CHUNK", (data) => {
-      if (data.session_id === sessionId) {
-        setTranscriptChunks((prev) => {
-          const exists = prev.find((c) => c.chunk_index === data.chunk_index);
-          if (exists) return prev;
-          return [...prev, data];
-        });
+    const unsub1 = subscribe("PARTICIPANT_JOINED", (data) => {
+      if (data.session_id === sessionId && data.role === "patient") {
+        setIsPatientJoined(true);
+        toast.info("Patient has joined the session. Recording started.");
+        if (sessionData?.status === "active" && !isRecordingRef.current) {
+          handleStartRecording();
+        }
       }
     });
 
@@ -137,119 +182,20 @@ export default function IndividualSession() {
       }
     });
 
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
-  }, [subscribe, sessionId, navigate]);
+    return () => {
+      unsub1(); unsub2(); unsub3(); unsub4();
+      handleStopRecording();
+    };
+  }, [subscribe, sessionId, navigate, handleStartRecording, handleStopRecording, sessionData]);
 
-  // Auto-scroll transcript
+  // Auto-start if session is already active on load
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [transcriptChunks]);
-
-  // Speech Recognition
-  const startRecording = useCallback(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech recognition not supported in this browser. Use Chrome.");
-      return;
+    if (sessionData?.status === "active" && !isRecordingRef.current) {
+      // We can't be sure if patient is joined yet, but if they are already in the session, 
+      // the PARTICIPANT_JOINED event might have been missed if it happened before we loaded.
+      // For now, we rely on the event or doctor clicking manually.
     }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (event) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const text = result[0].transcript;
-        const isFinal = result.isFinal;
-        const now = Date.now();
-
-        if (isFinal && text.trim()) {
-          const chunkIndex = chunkIndexRef.current++;
-          send("TRANSCRIPT_CHUNK", {
-            session_id: sessionId,
-            chunk_index: chunkIndex,
-            text: text.trim(),
-            speaker_role: "doctor",
-            start_time_ms: now - sessionStartTimeRef.current - 2000,
-            end_time_ms: now - sessionStartTimeRef.current,
-            confidence: result[0].confidence,
-            is_final: true,
-          });
-        }
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      if (event.error === "not-allowed") {
-        alert("Microphone access denied. Please allow microphone access.");
-        isRecordingRef.current = false;
-        setIsRecording(false);
-      }
-    };
-
-    recognition.onend = () => {
-      // Auto-restart only if we're still supposed to be recording
-      if (isRecordingRef.current && recognitionRef.current) {
-        try {
-          recognition.start();
-        } catch (err) {
-          // Silently ignore restart errors
-          console.debug("Speech recognition restart error:", err);
-        }
-      }
-    };
-
-    isRecordingRef.current = true;
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsRecording(true);
-
-    // Start audio recorder
-    startAudioRecording().catch(err => {
-      console.error("Failed to start audio recording:", err);
-    });
-  }, [send, sessionId, startAudioRecording]);
-
-  const stopRecording = useCallback(() => {
-    isRecordingRef.current = false;
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsRecording(false);
-
-    // Pause audio recorder
-    pauseAudioRecording();
-  }, [pauseAudioRecording]);
-
-
-  async function handleEndSession() {
-    setIsEnding(true);
-    stopRecording();
-
-    try {
-      // Stop and upload audio recording to local 's3' folder via backend
-      const audioResult = await stopAudioRecording();
-      if (audioResult?.blob) {
-        try {
-          await transcribeAudio(token, sessionId, audioResult.blob);
-          console.log("Recording saved to s3 folder successfully");
-        } catch (uploadErr) {
-          console.error("Failed to upload recording to s3:", uploadErr);
-        }
-      }
-
-      await endSession(token, { sessionId, sessionNotes: "" });
-      // Will navigate to review page when EMR_DRAFT_READY arrives
-    } catch (err) {
-      console.error("Failed to end session:", err);
-      setIsEnding(false);
-    }
-  }
+  }, [sessionData]);
 
   if (loading) {
     return (
@@ -301,8 +247,12 @@ export default function IndividualSession() {
                     <ChevronRight className="w-3 h-3 text-primary" />
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-primary/5 text-primary group-hover:bg-primary/10 transition-colors">
-                      <FileText className="w-4 h-4" />
+                    <div className={`p-2 rounded-lg ${doc.status === 'ready' ? 'bg-primary/5 text-primary group-hover:bg-primary/10' : 'bg-amber-50 text-amber-500'} transition-colors`}>
+                      {doc.status === 'ready' ? (
+                        <FileText className="w-4 h-4" />
+                      ) : (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
@@ -312,7 +262,7 @@ export default function IndividualSession() {
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-tighter font-semibold">
-                        {doc.type || doc.document_type || "General Document"}
+                        {doc.status === 'ready' ? (doc.type || doc.document_type || "General Document") : "Analyzing..."}
                       </p>
                     </div>
                   </div>
@@ -395,7 +345,7 @@ export default function IndividualSession() {
         </Card>
       </div>
 
-      {/* Center — Transcript */}
+      {/* Center — Transcript Area (Now Whole Audio Focused) */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Session Header */}
         <div className="flex items-center justify-between mb-6 bg-card p-4 rounded-xl border border-border shadow-sm">
@@ -408,7 +358,15 @@ export default function IndividualSession() {
                 <h2 className="text-xl font-bold tracking-tight">
                   {sessionData.patient_name}
                 </h2>
-                <Badge variant="success" className="animate-pulse">Active</Badge>
+                <Badge variant={sessionData.status === "active" ? "success" : "info"} className={sessionData.status === "active" ? "animate-pulse" : ""}>
+                  {sessionData.status === "active" ? "Active" : "Joined"}
+                </Badge>
+                {isPatientJoined && (
+                  <Badge variant="outline" className="text-primary border-primary/30 flex items-center gap-1">
+                    <UserCheck className="w-3 h-3" />
+                    Patient Online
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Stethoscope className="w-3 h-3" />
@@ -425,13 +383,13 @@ export default function IndividualSession() {
 
             <div className="flex items-center gap-2">
               {!isRecording ? (
-                <Button onClick={startRecording} className="gap-2 rounded-full shadow-lg shadow-primary/20 bg-primary hover:scale-105 transition-transform">
+                <Button onClick={handleStartRecording} className="gap-2 rounded-full shadow-lg shadow-primary/20 bg-primary hover:scale-105 transition-transform">
                   <Mic className="w-4 h-4" />
                   Start Recording
                 </Button>
               ) : (
                 <Button
-                  onClick={stopRecording}
+                  onClick={handleStopRecording}
                   variant="outline"
                   className="gap-2 rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all"
                 >
@@ -458,15 +416,15 @@ export default function IndividualSession() {
 
         {/* Recording Indicator */}
         {isRecording && (
-          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg animate-in fade-in slide-in-from-top-2">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-sm text-red-600 dark:text-red-400 font-medium">
-              Recording — speak clearly into your microphone
+              Recording entire conversation — captures both doctor and patient
             </span>
           </div>
         )}
 
-        {/* Transcript Area */}
+        {/* Center UI */}
         <Card className="flex-1 overflow-hidden flex flex-col relative group border-none shadow-none bg-transparent">
           <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/5 pointer-events-none opacity-50" />
 
@@ -507,9 +465,9 @@ export default function IndividualSession() {
                 </div>
 
                 <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-black tracking-tight text-foreground">Listening...</h3>
+                  <h3 className="text-2xl font-black tracking-tight text-foreground">Recording Full Conversation</h3>
                   <p className="text-muted-foreground max-w-sm mx-auto font-medium leading-relaxed">
-                    SEVAमित्र is capturing and processing clinical audio in real-time. Full EMR draft will be available upon completion.
+                    SEVAमित्र is securely capturing clinical audio. High-fidelity EMR documentation will be generated upon concluding the session.
                   </p>
                 </div>
               </>
@@ -519,14 +477,17 @@ export default function IndividualSession() {
                   <Mic className="w-10 h-10 opacity-20" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-muted-foreground">Ready for Consultation</h3>
+                  <h3 className="text-xl font-bold text-muted-foreground">
+                    {!isPatientJoined ? "Waiting for Patient..." : "Ready for Consultation"}
+                  </h3>
                   <p className="text-sm text-muted-foreground/60 max-w-[240px]">
-                    Click the "Start Recording" button to begin the clinical session.
+                    {!isPatientJoined
+                      ? "Recording will start automatically once the patient joins the workspace."
+                      : "Recording will start automatically once you begin speaking, or click start below."}
                   </p>
                 </div>
               </div>
             )}
-            <div ref={transcriptEndRef} />
           </CardContent>
         </Card>
       </div>
@@ -551,7 +512,7 @@ export default function IndividualSession() {
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                   <Brain className="w-5 h-5" />
                 </div>
-                <p className="text-xs font-medium max-w-[140px]">Initiating AI assistant synchronization...</p>
+                <p className="text-xs font-medium max-w-[140px]">Awaiting conversational context for insights...</p>
               </div>
             ) : (
               <div className="space-y-5 animate-in fade-in duration-500">

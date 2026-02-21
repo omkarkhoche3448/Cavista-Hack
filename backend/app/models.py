@@ -109,6 +109,23 @@ class PatientProfileUpdate(BaseModel):
     insurance_policy_number: Optional[str] = None
 
 
+class OnboardingRequest(BaseModel):
+    # From Users table
+    date_of_birth: date
+    gender: Literal["male", "female", "other", "prefer_not_to_say"]
+    phone: str
+    
+    # From Patient Profiles table
+    blood_type: Optional[str] = None
+    height_cm: Optional[float] = None
+    weight_kg: Optional[float] = None
+    emergency_contact_name: str
+    emergency_contact_phone: str
+    emergency_contact_relation: Optional[str] = None
+    insurance_provider: Optional[str] = None
+    insurance_policy_number: Optional[str] = None
+
+
 # ── Session ──
 
 class CreateSessionRequest(BaseModel):

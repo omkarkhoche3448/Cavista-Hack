@@ -29,6 +29,7 @@ import {
   BarChart3,
   StopCircle
 } from "lucide-react";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { listSessions, startSession, createSession } from "@/services/sessionService";
@@ -76,13 +77,12 @@ const SessionCard = ({ session, onStart, isStarting }) => {
                 <AlertTriangle className="w-3 h-3" />
               </Badge>
             )}
-            <Badge className={`whitespace-nowrap ${
-              session.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400' :
+            <Badge className={`whitespace-nowrap ${session.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400' :
               session.status === 'accepted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400' :
-              session.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' :
-              session.status === 'completed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-400' :
-              'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-400'
-            }`}>
+                session.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' :
+                  session.status === 'completed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-400' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-400'
+              }`}>
               {STATUS_BADGE[session.status]?.label ?? session.status}
             </Badge>
           </div>
@@ -99,7 +99,7 @@ const SessionCard = ({ session, onStart, isStarting }) => {
         <div className="flex items-center justify-between pt-4 border-t border-gray-200/50 dark:border-gray-800/50">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Clock className="w-4 h-4" />
-            <span>{new Date(session.created_at).toLocaleDateString()} {new Date(session.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            <span>{new Date(session.created_at).toLocaleDateString()} {new Date(session.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
 
           {(isAccepted || isActive) && (
@@ -188,7 +188,7 @@ export default function DoctorDashboard() {
                 timestamp: Date.now()
               }
             };
-            console.log('[Recording] Audio chunk sent', message.data.session_id);
+            // console.log('[Recording] Audio chunk sent', message.data.session_id);
           };
           reader.readAsDataURL(event.data);
         }
@@ -205,19 +205,23 @@ export default function DoctorDashboard() {
 
   // Stop microphone recording
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      
-      // Stop all audio tracks
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
       }
-
-      setIsRecording(false);
-      setRecordingSessionId(null);
-      console.log('[Recording] Stopped');
+      mediaRecorderRef.current = null;
     }
-  }, [isRecording]);
+
+    // Stop all audio tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    setIsRecording(false);
+    setRecordingSessionId(null);
+    console.log('[Recording] Stopped');
+  }, []);
 
   const fetchSessions = useCallback(async () => {
     if (!token) {
@@ -233,7 +237,7 @@ export default function DoctorDashboard() {
       if (Array.isArray(data)) {
         setSessions(data);
       } else {
-        console.warn("[DoctorDashboard] API returned unexpected data:", data);
+        toast.warning("Incomplete session data received");
         setSessions([]);
       }
     } catch (err) {
@@ -264,8 +268,6 @@ export default function DoctorDashboard() {
         closeForm();
         setPendingSessionId(null);
         setRequestSent(false);
-        // Start recording when session is approved
-        setTimeout(() => startRecording(data.session_id), 500);
       }
     });
     const unsub2 = subscribe("SESSION_REJECTED", (data) => {
@@ -299,23 +301,30 @@ export default function DoctorDashboard() {
         prev.map((s) => s.id === data.session_id ? { ...s, status: "processing" } : s)
       );
     });
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); };
+    const unsub6 = subscribe("TRANSCRIPTION_COMPLETE", (data) => {
+      toast.success("Consultation recording transcribed!");
+      // We could update specific session recording_url if needed
+    });
+    return () => {
+      unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6();
+      stopRecording();
+    };
   }, [subscribe, pendingSessionId, closeForm, startRecording, isRecording, recordingSessionId, stopRecording]);
 
   // Validate form fields
   const validateForm = useCallback(() => {
     const errors = {};
-    
+
     if (!formData.email.trim()) {
       errors.email = "Email is required";
     } else if (!validateEmail(formData.email.trim())) {
       errors.email = "Please enter a valid email address";
     }
-    
+
     if (formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH) {
       errors.chiefComplaint = `Chief complaint exceeds ${COMPLAINT_MAX_LENGTH} characters`;
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [formData]);
@@ -323,10 +332,10 @@ export default function DoctorDashboard() {
   // Called when doctor creates a new session via the inline form
   const handleCreateSession = useCallback(async () => {
     if (!validateForm()) return;
-    
+
     setIsCreating(true);
     setError(null);
-    
+
     try {
       const newSession = await createSession(token, {
         patientEmail: formData.email.trim(),
@@ -494,7 +503,7 @@ export default function DoctorDashboard() {
                           size="lg"
                           className="group/btn relative inline-flex items-center gap-4 px-8 py-7 text-xl font-bold rounded-full shadow-lg shadow-primary/30 transition-all duration-300 active:scale-95 hover:shadow-xl hover:shadow-primary/40"
                         >
-                          
+
                           <span className="relative z-10 flex items-center gap-3">
                             <Mic className="w-5 h-5" />
                             Create Session Request
@@ -556,11 +565,10 @@ export default function DoctorDashboard() {
                             placeholder="patient@example.com"
                             value={formData.email}
                             onChange={(e) => handleFormChange("email", e.target.value)}
-                            className={`h-11 text-base rounded-lg border transition-all ${
-                              formErrors.email
-                                ? "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500 focus:ring-red-500"
-                                : "border-gray-200 dark:border-gray-800 focus:border-primary focus:ring-primary"
-                            }`}
+                            className={`h-11 text-base rounded-lg border transition-all ${formErrors.email
+                              ? "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500 focus:ring-red-500"
+                              : "border-gray-200 dark:border-gray-800 focus:border-primary focus:ring-primary"
+                              }`}
                           />
                           {formErrors.email && (
                             <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 mt-2 animate-in fade-in">
@@ -581,11 +589,10 @@ export default function DoctorDashboard() {
                             placeholder="Describe the primary reason for this consultation..."
                             value={formData.chiefComplaint}
                             onChange={(e) => handleFormChange("chiefComplaint", e.target.value)}
-                            className={`min-h-[100px] text-base rounded-lg border resize-none transition-all ${
-                              formErrors.chiefComplaint
-                                ? "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500 focus:ring-red-500"
-                                : "border-gray-200 dark:border-gray-800 focus:border-primary focus:ring-primary"
-                            }`}
+                            className={`min-h-[100px] text-base rounded-lg border resize-none transition-all ${formErrors.chiefComplaint
+                              ? "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500 focus:ring-red-500"
+                              : "border-gray-200 dark:border-gray-800 focus:border-primary focus:ring-primary"
+                              }`}
                           />
                           <div className="flex items-center justify-between">
                             {formErrors.chiefComplaint && (
@@ -594,24 +601,22 @@ export default function DoctorDashboard() {
                                 <span>{formErrors.chiefComplaint}</span>
                               </div>
                             )}
-                            <span className={`text-xs font-medium ml-auto transition-colors ${
-                              formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH
-                                ? "text-red-600 dark:text-red-400"
-                                : formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH * 0.8
+                            <span className={`text-xs font-medium ml-auto transition-colors ${formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH
+                              ? "text-red-600 dark:text-red-400"
+                              : formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH * 0.8
                                 ? "text-yellow-600 dark:text-yellow-400"
                                 : "text-muted-foreground"
-                            }`}>
+                              }`}>
                               {formData.chiefComplaint.length}/{COMPLAINT_MAX_LENGTH}
                             </span>
                           </div>
                         </div>
 
                         {/* Emergency Flag */}
-                        <div className={`flex items-center gap-3 p-4 rounded-lg border transition-all ${
-                          formData.isEmergency
-                            ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
-                            : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
-                        }`}>
+                        <div className={`flex items-center gap-3 p-4 rounded-lg border transition-all ${formData.isEmergency
+                          ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                          : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
+                          }`}>
                           <input
                             type="checkbox"
                             id="emergency"
@@ -714,9 +719,9 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="flex items-center justify-center gap-1.5 py-4">
                             <div className="w-2 bg-red-600 rounded-full animate-recording-bar-1" />
-                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-2" style={{animationDelay: '0.1s'}} />
-                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-3" style={{animationDelay: '0.2s'}} />
-                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-4" style={{animationDelay: '0.3s'}} />
+                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-2" style={{ animationDelay: '0.1s' }} />
+                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-3" style={{ animationDelay: '0.2s' }} />
+                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-4" style={{ animationDelay: '0.3s' }} />
                           </div>
                         </div>
 

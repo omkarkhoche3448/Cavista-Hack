@@ -30,7 +30,9 @@ def _call(endpoint: str, payload: dict):
         resp = requests.post(url, json=payload, timeout=90)
         print(f"[AI_SERVICE] Response {resp.status_code}")
         if resp.status_code == 200:
-            return resp.json()
+            result = resp.json()
+            print(f"[AI_SERVICE] SUCCESS: Response from {endpoint}: {result}")
+            return result
         elif resp.status_code == 404:
             print(f"[AI_SERVICE] 404: {url} — skipping.")
             return None
@@ -42,7 +44,7 @@ def _call(endpoint: str, payload: dict):
         return None
 
 
-def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_url: str = None) -> dict:
+def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_url: str = None, transcript: str = None, patient_name: str = None, patient_gender: str = None) -> dict:
     """
     Requests the external AI to generate a structured EMR draft from session data.
     
@@ -53,26 +55,79 @@ def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_
         chief_complaint (str): The patient's primary complaint.
         document_insights (list, optional): Summaries of shared medical documents.
         audio_url (str, optional): Link to the session recording.
+        transcript (str, optional): Raw text transcript as fallback context.
+        patient_name (str, optional): Full name of the patient.
+        patient_gender (str, optional): Gender of the patient.
         
     Returns:
         dict: A structured EMR object with HPI, Assessment, Plan, etc.
     """
+    # Prefer actual transcript text over audio URL — the AI needs readable text
+    conversation = transcript or audio_url or ""
+    print(f"[AI_SERVICE] generate_emr_draft: conversation length={len(conversation)}, using={'transcript' if transcript else 'audio_url' if audio_url else 'empty'}")
+    
     payload = {
-        "conversation": audio_url or "",
+        "conversation": conversation,
         "chief_complaint": chief_complaint,
         "report_summaries": document_insights or [],
+        "patient_name": patient_name,
+        "patient_gender": patient_gender,
     }
     result = _call("/ai/generate-emr", payload)
-    return result or {
-        "chief_complaint": chief_complaint,
+    
+    # Helper: try multiple keys (API may use different names than our DB schema)
+    def pick(data, *keys, default=None):
+        for k in keys:
+            val = data.get(k)
+            if val is not None:
+                return val
+        return default
+
+    if result:
+        print(f"[AI_SERVICE] Raw EMR keys returned: {list(result.keys())}")
+
+        # Extract diagnoses from either 'diagnoses' list or 'icd10_codes' list
+        diagnoses = pick(result, "diagnoses", default=[])
+        icd_codes = pick(result, "icd10_codes", default=[])
+        if not diagnoses and icd_codes:
+            diagnoses = icd_codes
+
+        # The external API returns 'plan' (list) but our DB expects 'treatment_plan' (text)
+        plan_data = pick(result, "treatment_plan", "plan", default="Pending AI processing.")
+        if isinstance(plan_data, list):
+            plan_data = "\n".join(f"• {item}" for item in plan_data) if plan_data else "Pending AI processing."
+
+        return {
+            "chief_complaint": pick(result, "chief_complaint", default=chief_complaint or "Unknown"),
+            "history_present_illness": pick(result, "history_present_illness", "history_of_present_illness", default="Pending AI processing."),
+            "past_medical_history": pick(result, "past_medical_history", default=[]),
+            "medications": pick(result, "medications", default=[]),
+            "allergies": pick(result, "allergies", default=[]),
+            "vital_signs": pick(result, "vital_signs", default={}),
+            "review_of_systems": pick(result, "review_of_systems", default={}),
+            "physical_examination": pick(result, "physical_examination", default="Pending AI processing."),
+            "assessment": pick(result, "assessment", default="Pending AI processing."),
+            "diagnoses": diagnoses,
+            "treatment_plan": plan_data,
+            "medications_prescribed": pick(result, "medications_prescribed", default=[]),
+            "follow_up_plan": pick(result, "follow_up_plan", "follow_up", default="Pending AI processing."),
+            "patient_instructions": pick(result, "patient_instructions", default="Pending AI processing."),
+        }
+
+    return {
+        "chief_complaint": chief_complaint or "Unknown",
         "history_present_illness": "Pending AI processing.",
         "assessment": "Pending AI processing.",
         "diagnoses": [],
         "treatment_plan": "Pending AI processing.",
+        "physical_examination": "Pending AI processing.",
+        "past_medical_history": [],
+        "medications": [],
+        "allergies": [],
     }
 
 
-def map_icd_codes(diagnoses: list, audio_url: str = None) -> list:
+def map_icd_codes(diagnoses: list, audio_url: str = None, transcript: str = None) -> list:
     """
     Suggests ICD-10 medical codes for a list of clinical diagnoses.
     
@@ -82,17 +137,18 @@ def map_icd_codes(diagnoses: list, audio_url: str = None) -> list:
     Args:
         diagnoses (list): String list of clinical diagnoses.
         audio_url (str, optional): Context from the recording for higher accuracy.
+        transcript (str, optional): Raw text transcript fallback.
         
     Returns:
         list: List of mapping objects (text, code, description, confidence).
     """
     if not diagnoses:
         return []
-    result = _call("/ai/map-icd", {"diagnoses": diagnoses, "conversation": audio_url})
+    result = _call("/ai/map-icd", {"diagnoses": diagnoses, "conversation": audio_url or transcript})
     return result or []
 
 
-def suggest_treatments(diagnoses: list, current_medications=None, audio_url: str = None) -> list:
+def suggest_treatments(diagnoses: list, current_medications=None, audio_url: str = None, transcript: str = None) -> list:
     """
     Generates evidence-based treatment suggestions based on diagnoses.
     
@@ -103,6 +159,7 @@ def suggest_treatments(diagnoses: list, current_medications=None, audio_url: str
         diagnoses (list): List of patient diagnoses.
         current_medications (list, optional): Patient's existing meds to check for interactions.
         audio_url (str, optional): Clinical context from recording.
+        transcript (str, optional): Raw text transcript fallback.
         
     Returns:
         list: Suggested treatments with priority and rationale.
@@ -111,7 +168,7 @@ def suggest_treatments(diagnoses: list, current_medications=None, audio_url: str
         return []
     result = _call("/ai/suggest-treatments", {
         "diagnoses": diagnoses,
-        "conversation": audio_url,
+        "conversation": audio_url or transcript,
         "current_medications": current_medications,
     })
     return result or []

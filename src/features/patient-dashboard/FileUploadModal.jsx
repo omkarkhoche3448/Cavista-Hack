@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,24 +37,43 @@ export default function FileUploadModal({ open, onOpenChange, onUploaded }) {
     e.preventDefault();
     if (!file || !title.trim()) return;
 
-    setLoading(true);
     setError("");
+    setLoading(true);
 
+    const tempId = "temp-" + Date.now();
+
+    // Add placeholder immediately so the card appears right away
+    const placeholderDoc = {
+      id: tempId,
+      title: title.trim(),
+      document_type: docType,
+      status: "uploading",
+      created_at: new Date().toISOString(),
+    };
+    onUploaded?.(placeholderDoc);
+
+    // Close modal immediately — feels fast
+    onOpenChange(false);
+    setFile(null);
+    setTitle("");
+    setDocType("other");
+    setLoading(false);
+
+    // Now await the real upload in the background
     try {
-      const doc = await uploadDocument(session.access_token, {
+      const realDoc = await uploadDocument(session.access_token, {
         file,
         title: title.trim(),
         documentType: docType,
       });
-      onUploaded?.(doc);
-      onOpenChange(false);
-      setFile(null);
-      setTitle("");
-      setDocType("other");
+      // Replace placeholder with the real doc (status: "ready") from the API
+      onUploaded?.({ ...realDoc, _replaceTempId: tempId });
+      toast.success("Document uploaded successfully!");
     } catch (err) {
-      setError(err.message || "Upload failed");
-    } finally {
-      setLoading(false);
+      console.error("Upload failed:", err);
+      // Mark the placeholder as failed
+      onUploaded?.({ id: tempId, _markFailed: true });
+      toast.error("Upload failed. Please try again.");
     }
   }
 

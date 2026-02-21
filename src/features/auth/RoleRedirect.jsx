@@ -3,7 +3,7 @@ import { useAuth } from "./AuthContext";
 import { Loader2 } from "lucide-react";
 
 export default function RoleRedirect() {
-  const { role, loading, isAuthenticated } = useAuth();
+  const { role, loading, isAuthenticated, profile } = useAuth();
 
   if (loading) {
     return (
@@ -21,6 +21,10 @@ export default function RoleRedirect() {
 
   if (!isAuthenticated || !role) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (role === "patient" && profile?.status !== "active") {
+    return <Navigate to="/patient/onboarding" replace />;
   }
 
   return <Navigate to={`/${role}/dashboard`} replace />;

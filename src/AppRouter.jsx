@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import DefaultLayout from "./components/layout/DefaultLayout";
 import {
   LoginPage,
@@ -7,6 +7,7 @@ import {
   ProtectedRoute,
   GuestRoute,
   RoleRoute,
+  useAuth,
 } from "@/features/auth";
 import RoleRedirect from "./features/auth/RoleRedirect";
 import DoctorCall from "./pages/doctor/DoctorCallPage.jsx";
@@ -17,24 +18,44 @@ import IndividualPatient from "./pages/doctor/IndividualPatient.jsx";
 import PostSessionReview from "./pages/doctor/ReviewSession.jsx";
 import DoctorProfile from "./pages/doctor/DoctorProfilePage.jsx";
 import PatientDashboard from "./pages/patient/PatientDashboard.jsx";
-import PatientProfile from "./pages/patient/PatientProfilePage.jsx";  
+import PatientProfile from "./pages/patient/PatientProfilePage.jsx";
 import Home from "./pages/Home.jsx";
 import IndividualSession from "./pages/doctor/IndividualSession";
 import IndividualSessionSummary from "./pages/patient/IndividualSession";
 import PatientCall from "./pages/patient/PatientCallPage.jsx";
 import Uploads from "./pages/patient/Uploads";
 import PatientAllSessions from "./pages/patient/Sessions.jsx";
+import Onboarding from "./pages/patient/Onboarding.jsx";
 const ProtectedDoctorRoute = ({ children }) => (
   <ProtectedRoute>
     <RoleRoute allowedRole="doctor">{children}</RoleRoute>
   </ProtectedRoute>
 );
 
-const ProtectedPatientRoute = ({ children }) => (
-  <ProtectedRoute>
-    <RoleRoute allowedRole="patient">{children}</RoleRoute>
-  </ProtectedRoute>
-);
+const ProtectedPatientRoute = ({ children }) => {
+  const { profile, loading, isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return null; // Or a loader
+  }
+
+  if (
+    isAuthenticated &&
+    profile &&
+    profile.role === "patient" &&
+    profile.status !== "active" &&
+    location.pathname !== "/patient/onboarding"
+  ) {
+    return <Navigate to="/patient/onboarding" replace />;
+  }
+
+  return (
+    <ProtectedRoute>
+      <RoleRoute allowedRole="patient">{children}</RoleRoute>
+    </ProtectedRoute>
+  );
+};
 
 export default function AppRouter() {
   return (
@@ -174,6 +195,14 @@ export default function AppRouter() {
         element={
           <ProtectedPatientRoute>
             <PatientProfile />
+          </ProtectedPatientRoute>
+        }
+      />
+      <Route
+        path="/patient/onboarding"
+        element={
+          <ProtectedPatientRoute>
+            <Onboarding />
           </ProtectedPatientRoute>
         }
       />

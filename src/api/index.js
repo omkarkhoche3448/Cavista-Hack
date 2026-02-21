@@ -7,6 +7,7 @@ export const LOGIN_URL = `${AUTH_API}/login`;
 export const PROFILE_URL = `${AUTH_API}/me`;
 export const DOCTOR_PROFILE_URL = `${AUTH_API}/me/doctor-profile`;
 export const PATIENT_PROFILE_URL = `${AUTH_API}/me/patient-profile`;
+export const ONBOARD_URL = `${AUTH_API}/onboard`;
 
 // Sessions
 export const SESSIONS_API = `${API_URL}/api/sessions`;

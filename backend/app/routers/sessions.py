@@ -4,6 +4,7 @@ Session Router — CRUD + WebSocket endpoint for clinical sessions.
 
 import json
 import logging
+import asyncio
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query, UploadFile, File, Form, BackgroundTasks
 from jose import jwt, JWTError
@@ -47,16 +48,25 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
     user_id = "unknown"
 
     try:
-        header = jwt.get_unverified_header(token)
-        alg = header.get("alg", "HS256")
-        if alg == "HS256":
-            payload = jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
-        else:
-            signing_key = _get_signing_key(token)
-            if not signing_key:
-                await websocket.close(code=4001, reason="Invalid token")
-                return
-            payload = jwt.decode(token, signing_key, algorithms=[alg], audience="authenticated")
+        try:
+            header = jwt.get_unverified_header(token)
+            alg = header.get("alg", "HS256")
+            if alg == "HS256":
+                payload = jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+            else:
+                signing_key = _get_signing_key(token)
+                if not signing_key:
+                    await websocket.close(code=4001, reason="Invalid token structure")
+                    return
+                payload = jwt.decode(token, signing_key, algorithms=[alg], audience="authenticated")
+        except jwt.ExpiredSignatureError:
+            logger.warning(f"WS connection attempt with expired token.")
+            await websocket.close(code=4001, reason="Signature has expired")
+            return
+        except jwt.JWTError as e:
+            logger.warning(f"WS connection attempt with invalid token: {e}")
+            await websocket.close(code=4001, reason="Invalid token")
+            return
 
         user_id = payload.get("sub")
         if not user_id:
@@ -130,25 +140,53 @@ async def handle_ws_event(user_id: str, event: str, data: dict):
                 "is_final": data.get("is_final", False),
             })
 
+    elif event == "JOIN_SESSION":
+        session_id = data.get("session_id")
+        if not session_id:
+            return
+        
+        session = supabase.table("sessions").select("doctor_id, patient_id").eq("id", session_id).single().execute()
+        if session.data:
+            participants = [session.data["doctor_id"], session.data["patient_id"]]
+            role = "doctor" if user_id == session.data["doctor_id"] else "patient"
+            # Broadcast to others in the session
+            await manager.send_to_session(participants, "PARTICIPANT_JOINED", {
+                "session_id": session_id,
+                "user_id": user_id,
+                "role": role
+            })
+
     elif event == "REQUEST_AI_INSIGHT":
         session_id = data.get("session_id")
         if not session_id:
             return
-        chunks = (
-            supabase.table("transcript_chunks")
-            .select("raw_text, speaker_role")
-            .eq("session_id", session_id)
-            .order("chunk_index")
-            .execute()
-        )
-        transcript = "\n".join(f"[{c['speaker_role']}]: {c['raw_text']}" for c in (chunks.data or []))
-        if transcript:
-            try:
-                insight = ai_service.generate_live_insight(transcript)
-                await manager.send_to_user(user_id, "AI_INSIGHT_READY", {"session_id": session_id, "insight": insight})
-            except Exception as e:
-                logger.error(f"AI insight error: {e}")
-                await manager.send_to_user(user_id, "ERROR", {"message": "AI insight generation failed"})
+        
+        # Use asyncio.create_task to background the LLM call without blocking the WS loop
+        asyncio.create_task(run_live_insight(user_id, session_id))
+
+
+async def run_live_insight(user_id: str, session_id: str):
+    """
+    Background worker for live AI insights during a session.
+    """
+    from ..db import get_supabase
+    supabase = get_supabase()
+    
+    chunks = (
+        supabase.table("transcript_chunks")
+        .select("raw_text, speaker_role")
+        .eq("session_id", session_id)
+        .order("chunk_index")
+        .execute()
+    )
+    transcript = "\n".join(f"[{c['speaker_role']}]: {c['raw_text']}" for c in (chunks.data or []))
+    if transcript:
+        try:
+            insight = ai_service.generate_live_insight(transcript)
+            await manager.send_to_user(user_id, "AI_INSIGHT_READY", {"session_id": session_id, "insight": insight})
+        except Exception as e:
+            logger.error(f"AI insight error: {e}")
+            await manager.send_to_user(user_id, "ERROR", {"message": "AI insight generation failed"})
 
 
 # ─── REST Endpoints ───
@@ -368,48 +406,70 @@ async def end_session(
     Returns:
         dict: Confirmation that processing has started.
     """
-    session = (
-        supabase.table("sessions")
-        .select("*")
-        .eq("id", body.session_id)
-        .eq("doctor_id", current_user["id"])
-        .eq("status", "active")
-        .single()
-        .execute()
-    )
+    # Look for session owned by this doctor — accept ANY status since the background
+    # transcription/AI pipeline may have already advanced it to 'processing' or 'completed'
+    try:
+        session = (
+            supabase.table("sessions")
+            .select("*")
+            .eq("id", body.session_id)
+            .eq("doctor_id", current_user["id"])
+            .single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
     if not session.data:
-        raise HTTPException(status_code=404, detail="Active session not found.")
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    current_status = session.data.get("status", "active")
+    print(f"[END_SESSION] Session {body.session_id} current status: '{current_status}'")
+
+    # If already completed or ended, just return success — nothing more to do
+    if current_status in ("completed", "ended"):
+        return {"status": current_status, "session_id": body.session_id}
 
     now = datetime.now(timezone.utc).isoformat()
 
-    # Update state to processing immediately
-    supabase.table("sessions").update({
-        "status": "processing",
-        "ended_at": now,
-        "session_notes": body.session_notes,
-        "modified_by": current_user["id"],
-    }).eq("id", body.session_id).execute()
+    # Only update if still active (avoid overwriting if already processing)
+    if current_status == "active":
+        supabase.table("sessions").update({
+            "status": "processing",
+            "ended_at": now,
+            "session_notes": body.session_notes,
+            "modified_by": current_user["id"],
+        }).eq("id", body.session_id).execute()
 
-    supabase.table("session_state_history").insert({
-        "session_id": body.session_id,
-        "from_status": "active",
-        "to_status": "processing",
-        "changed_by": current_user["id"],
-    }).execute()
+        try:
+            supabase.table("session_state_history").insert({
+                "session_id": body.session_id,
+                "from_status": "active",
+                "to_status": "processing",
+                "changed_by": current_user["id"],
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Could not insert session state history: {e}")
 
-    patient_id = session.data["patient_id"]
-    ws_payload = {"session_id": body.session_id, "status": "processing"}
-    await manager.send_to_user(patient_id, "SESSION_ENDED", ws_payload)
-    await manager.send_to_user(current_user["id"], "SESSION_ENDED", ws_payload)
+        patient_id = session.data["patient_id"]
+        ws_payload = {"session_id": body.session_id, "status": "processing"}
+        await manager.send_to_user(patient_id, "SESSION_ENDED", ws_payload)
+        await manager.send_to_user(current_user["id"], "SESSION_ENDED", ws_payload)
+    else:
+        print(f"[END_SESSION] Session {body.session_id} already in '{current_status}' state, skipping status update.")
 
-    # Queue the heavy AI pipeline
-    background_tasks.add_task(
-        run_ai_pipeline,
-        body.session_id,
-        current_user["id"],
-        session.data.get("chief_complaint", ""),
-        now
-    )
+    # Queue the heavy AI pipeline ONLY if we haven't already started audio transcription
+    # (Because if we have audio, run_audio_transcription will call run_ai_pipeline once it has the text)
+    if current_status == "active" and not session.data.get("recording_url"):
+        background_tasks.add_task(
+            run_ai_pipeline,
+            body.session_id,
+            current_user["id"],
+            session.data.get("chief_complaint", ""),
+            now
+        )
+    else:
+        print(f"[END_SESSION] Skipping run_ai_pipeline for {body.session_id} (status='{current_status}', has_recording={bool(session.data.get('recording_url'))})")
 
     return {"status": "processing", "session_id": body.session_id}
 
@@ -428,6 +488,33 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         start_time (str): Timestamp when processing was initiated.
     """
     supabase = get_supabase()
+    print(f"[AI_PIPELINE] Starting for session {session_id}, chief_complaint='{chief_complaint}'")
+    
+    # Ensure session is in processing state
+    try:
+        supabase.table("sessions").update({"status": "processing"}).eq("id", session_id).in_("status", ["active", "scheduled"]).execute()
+    except Exception:
+        pass
+
+    # Fetch patient info once so we can use name/gender in AI prompts and notify them
+    patient_id = None
+    patient_name = "Unknown"
+    patient_gender = "Unknown"
+    try:
+        _sess = (
+            supabase.table("sessions")
+            .select("patient_id, patient:users!patient_id(first_name, last_name, gender)")
+            .eq("id", session_id)
+            .single()
+            .execute()
+        )
+        if _sess.data:
+            patient_id = _sess.data.get("patient_id")
+            pat = _sess.data.get("patient", {})
+            patient_name = f"{pat.get('first_name', '')} {pat.get('last_name', '')}".strip() or "Unknown"
+            patient_gender = pat.get("gender", "Unknown")
+    except Exception as e:
+        logger.warning(f"Error fetching patient info for AI pipeline: {e}")
     try:
         # 1. Compile transcript
         chunks = (
@@ -452,6 +539,7 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         # 2. Get recording URL
         session_info = supabase.table("sessions").select("recording_url").eq("id", session_id).single().execute()
         audio_url = session_info.data.get("recording_url") if session_info.data else None
+        print(f"[AI_PIPELINE] Audio URL found: {audio_url is not None}")
 
         # 3. Get pre-session document insights
         try:
@@ -465,12 +553,16 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         except Exception as e:
             logger.warning(f"Could not fetch pre-session insights: {e}")
             document_insights = []
-
+        
+        print(f"[AI_PIPELINE] Transcript length: {len(transcript)}")
         # 4. Generate EMR draft (External AI Call)
         emr_content = ai_service.generate_emr_draft(
             audio_url=audio_url,
+            transcript=transcript,
             chief_complaint=chief_complaint,
             document_insights=document_insights,
+            patient_name=patient_name,
+            patient_gender=patient_gender,
         )
 
         # 5. Save EMR draft
@@ -506,7 +598,7 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         # 6. Map ICD Codes
         diagnoses = emr_content.get("diagnoses", [])
         if diagnoses:
-            icd_mappings = ai_service.map_icd_codes(diagnoses, audio_url=audio_url)
+            icd_mappings = ai_service.map_icd_codes(diagnoses, audio_url=audio_url, transcript=transcript)
             for mapping in icd_mappings:
                 try:
                     supabase.table("icd_mappings").insert({
@@ -522,11 +614,12 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
                     }).execute()
                 except Exception as db_err:
                     logger.warning(f"Could not insert ICD mapping: {db_err}")
-
+ 
         # 7. Treatment Suggestions
         treatments = ai_service.suggest_treatments(
             diagnoses=diagnoses,
             audio_url=audio_url,
+            transcript=transcript,
             current_medications=emr_content.get("medications"),
         )
         if treatments:
@@ -566,18 +659,28 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         except Exception as db_err:
             logger.warning(f"Could not insert patient summary: {db_err}")
 
-        # Final Update: Set session to ended
-        supabase.table("sessions").update({"status": "ended"}).eq("id", session_id).execute()
+        # Final Update: Set session to completed
+        supabase.table("sessions").update({"status": "completed"}).eq("id", session_id).execute()
 
-        # Notify via WebSocket that the draft is ready for review
+        # Notify doctor that EMR draft is ready for review
         await manager.send_to_user(doctor_id, "EMR_DRAFT_READY", {
             "session_id": session_id,
             "draft_id": draft_id,
         })
 
+        # Notify patient that AI processing is complete
+        ai_done_payload = {"session_id": session_id, "status": "completed"}
+        await manager.send_to_user(doctor_id, "AI_PROCESSING_COMPLETE", ai_done_payload)
+        if patient_id:
+            await manager.send_to_user(patient_id, "AI_PROCESSING_COMPLETE", ai_done_payload)
+
     except Exception as e:
         logger.error(f"AI pipeline error for session {session_id}: {e}")
-        supabase.table("sessions").update({"status": "ended"}).eq("id", session_id).execute()
+        supabase.table("sessions").update({"status": "completed"}).eq("id", session_id).execute()
+        error_payload = {"session_id": session_id, "status": "completed"}
+        await manager.send_to_user(doctor_id, "AI_PROCESSING_COMPLETE", error_payload)
+        if patient_id:
+            await manager.send_to_user(patient_id, "AI_PROCESSING_COMPLETE", error_payload)
         await manager.send_to_user(doctor_id, "ERROR", {
             "message": f"AI processing encountered an error: {str(e)}",
             "session_id": session_id,
@@ -648,7 +751,7 @@ def get_session(
     try:
         session = (
             supabase.table("sessions")
-            .select("*, doctor:users!doctor_id(first_name, last_name, email), patient:users!patient_id(first_name, last_name, email)")
+            .select("*, doctor:users!doctor_id(first_name, last_name, email), patient:users!patient_id(first_name, last_name, email, gender, date_of_birth)")
             .eq("id", session_id)
             .single()
             .execute()
@@ -666,6 +769,8 @@ def get_session(
         s["patient_name"] = f"{pat.get('first_name', '')} {pat.get('last_name', '')}".strip()
         s["doctor_email"] = doc.get("email")
         s["patient_email"] = pat.get("email")
+        s["patient_gender"] = pat.get("gender")
+        s["patient_dob"] = pat.get("date_of_birth")
         return s
     except HTTPException:
         raise
@@ -745,8 +850,70 @@ def get_session_notifications(
     return result.data or []
 
 
+async def run_audio_transcription(session_id: str, recording_url: str, uploaded_key: str, user_id: str):
+    """
+    Background worker for off-peak audio transcription via external API.
+    """
+    try:
+        print(f"[TRANSCRIPTION-BG] Calling external API for session {session_id}, audio_url={recording_url}")
+        response = requests.post(
+            f"{settings.ANALYSIS_API_URL}/transcribe/",
+            json={
+                "audio_url": recording_url,
+            },
+            timeout=180,
+        )
+        if response.status_code == 200:
+            data = response.json()
+            print(f"[TRANSCRIPTION-BG] Raw response keys: {list(data.keys())}")
+            print(f"[TRANSCRIPTION-BG] Raw response: {data}")
+            
+            # The external API returns "transcription" (not "transcript")
+            transcript_text = data.get("transcription", "") or data.get("transcript", "")
+            print(f"[TRANSCRIPTION-BG] Success for session {session_id}. Transcript length: {len(transcript_text)}")
+            
+            # Save the transcript back to DB so run_ai_pipeline can see it
+            if transcript_text:
+                supabase = get_supabase()
+                try:
+                    supabase.table("transcript_chunks").insert({
+                        "session_id": session_id,
+                        "chunk_index": 0,
+                        "speaker_role": "doctor",
+                        "raw_text": transcript_text,
+                        "is_final": True
+                    }).execute()
+                    print(f"[TRANSCRIPTION-BG] Transcript chunk saved to DB for session {session_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to save automated transcript chunk: {e}")
+            else:
+                print(f"[TRANSCRIPTION-BG] WARNING: Transcript is empty for session {session_id}!")
+
+            # Notify user via WebSocket
+            await manager.send_to_user(user_id, "TRANSCRIPTION_COMPLETE", {
+                "session_id": session_id,
+                "status": "success",
+                "recording_url": recording_url
+            })
+
+            # CHAIN: Now run the AI pipeline since we have the transcript
+            supabase = get_supabase()
+            sess_data = supabase.table("sessions").select("chief_complaint, ended_at").eq("id", session_id).single().execute()
+            chief_complaint = sess_data.data.get("chief_complaint", "") if sess_data.data else ""
+            ended_at = sess_data.data.get("ended_at", "") if sess_data.data else ""
+
+            await run_ai_pipeline(session_id, user_id, chief_complaint, ended_at)
+
+        else:
+            logger.error(f"External Transcribe API Error ({response.status_code}): {response.text}")
+    except Exception as e:
+        logger.error(f"Background transcription failed for {session_id}: {e}")
+
+
+
 @router.post("/transcribe")
 async def transcribe_audio(
+    background_tasks: BackgroundTasks,
     session_id: str = Form(...),
     file: UploadFile = File(...),
     current_user: dict = Depends(require_role("doctor")),
@@ -761,9 +928,10 @@ async def transcribe_audio(
     Args:
         session_id (str): Session UUID.
         file (UploadFile): Recorded audio file (WebM/WAV).
+        background_tasks (BackgroundTasks): Injected background task manager.
         
     Returns:
-        dict: Success status and external analysis response.
+        dict: Success status and initial recording URL.
     """
     try:
         content = await file.read()
@@ -777,29 +945,25 @@ async def transcribe_audio(
         recording_url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{uploaded_key}"
 
         try:
-            supabase.table("sessions").update({"recording_url": recording_url}).eq("id", session_id).execute()
+             supabase.table("sessions").update({"recording_url": recording_url}).eq("id", session_id).execute()
         except Exception as db_err:
             logger.warning(f"Recording URL not saved to DB: {db_err}")
 
-        try:
-            response = requests.post(
-                f"{settings.ANALYSIS_API_URL}/transcribe/",
-                json={
-                    "audio_url": recording_url,
-                    "s3_bucket": settings.AWS_S3_BUCKET,
-                    "s3_key": uploaded_key,
-                    "s3_region": settings.AWS_REGION,
-                },
-                timeout=180,
-            )
-            external_resp = response.json() if response.status_code == 200 else {"error": response.text, "status_code": response.status_code}
-            if response.status_code != 200:
-                logger.error(f"External Transcribe API Error ({response.status_code}): {response.text}")
-        except Exception as api_err:
-            logger.error(f"Failed to call external transcribe API: {api_err}")
-            external_resp = {"error": str(api_err)}
+        # Offload external AI transcription to background task (takes up to 180s)
+        background_tasks.add_task(
+            run_audio_transcription,
+            session_id,
+            recording_url,
+            uploaded_key,
+            current_user["id"]
+        )
 
-        return {"status": "success", "recording_url": recording_url, "session_id": session_id, "external_analysis": external_resp}
+        return {
+            "status": "processing", 
+            "recording_url": recording_url, 
+            "session_id": session_id,
+            "message": "Audio uploaded. Transcription is processing in the background."
+        }
 
     except HTTPException:
         raise

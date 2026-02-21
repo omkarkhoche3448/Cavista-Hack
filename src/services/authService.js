@@ -1,5 +1,5 @@
 import { supabase } from "@/config/supabase";
-import { PROFILE_URL } from "@/api";
+import { PROFILE_URL, ONBOARD_URL } from "@/api";
 
 export async function signUpWithEmail({
   email,
@@ -83,6 +83,24 @@ export async function updateProfile(accessToken, updates) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || "Failed to update profile");
+  }
+
+  return res.json();
+}
+
+export async function onboardPatient(accessToken, data) {
+  const res = await fetch(ONBOARD_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Failed to complete onboarding");
   }
 
   return res.json();

@@ -30,7 +30,7 @@ export default function PatientSessionPage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { session: authSession } = useAuth();
-  const { subscribe } = useWebSocket();
+  const { subscribe, send } = useWebSocket();
   const token = authSession?.access_token;
 
   const [sessionData, setSessionData] = useState(null);
@@ -80,6 +80,13 @@ export default function PatientSessionPage() {
 
     load();
   }, [token, sessionId]);
+
+  // Join session room via WS
+  useEffect(() => {
+    if (sessionData && sessionId) {
+      send("JOIN_SESSION", { session_id: sessionId });
+    }
+  }, [sessionData, sessionId, send]);
 
   // Listen for transcript and session events
   useEffect(() => {

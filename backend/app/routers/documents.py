@@ -7,7 +7,7 @@ import json
 import uuid
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from supabase import Client
 
 from ..config import settings
@@ -47,8 +47,40 @@ def _enrich_doc(doc: dict) -> dict:
     return doc
 
 
+async def run_document_analysis(doc_id: str, signed_url: str, user_id: str, patient_name: str, document_type: str):
+    """
+    Background worker to perform AI analysis on a document.
+    """
+    from ..db import get_supabase
+    supabase = get_supabase()
+    
+    try:
+        print(f"[ANALYSIS-BG] Starting analysis for doc {doc_id}")
+        analysis_data = ai_service.analyze_lab_report(signed_url, user_id, patient_name, document_type)
+        if analysis_data:
+            supabase.table("medical_documents").update({
+                "ocr_extracted_text": json.dumps(analysis_data),
+                "status": "ready",
+            }).eq("id", doc_id).execute()
+            
+            # Notify user via WebSocket
+            await manager.send_to_user(user_id, "DOCUMENT_ANALYSIS_COMPLETE", {
+                "document_id": doc_id,
+                "status": "ready",
+                "analysis": analysis_data
+            })
+            print(f"[ANALYSIS-BG] Complete for doc {doc_id}")
+        else:
+            print(f"[ANALYSIS-BG] No data returned for doc {doc_id}")
+            supabase.table("medical_documents").update({"status": "failed"}).eq("id", doc_id).execute()
+    except Exception as e:
+        print(f"[ANALYSIS-BG] Exception for doc {doc_id}: {e}")
+        supabase.table("medical_documents").update({"status": "failed"}).eq("id", doc_id).execute()
+
+
 @router.post("", response_model=DocumentResponse)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: str = Form(...),
     document_type: str = Form("other"),
@@ -57,27 +89,13 @@ async def upload_document(
     supabase: Client = Depends(get_supabase),
 ):
     """
-    Handles medical document upload to S3 and triggers AI analysis.
-    
-    Why: Patients need to provide medical records for doctors to review during sessions.
-    Where: Called by the "Upload Document" Modal in the Patient Dashboard.
-    
-    Args:
-        file (UploadFile): The binary file (PDF, Image, etc.).
-        title (str): Display name for the document.
-        document_type (str): Category (e.g., 'lab_report', 'prescription').
-        description (str, optional): Additional notes.
-        current_user (dict): Injected authenticated patient.
-        supabase (Client): Injected Supabase client.
-        
-    Returns:
-        dict: The created document record with initial analysis result.
+    Handles medical document upload to S3 and triggers AI analysis in the background.
     """
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Only patients can upload documents.")
 
     content = await file.read()
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    file_ext = file.filename.split(".")[-1] if (file.filename and "." in file.filename) else "bin"
     storage_key = f"{current_user['id']}/{uuid.uuid4()}.{file_ext}"
 
     try:
@@ -110,25 +128,16 @@ async def upload_document(
 
     doc = result.data[0]
 
-    # Call external analysis API once, right after successful upload.
-    try:
-        patient_name = f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip()
-        print(f"[ANALYSIS] Calling analysis for doc {doc['id']}, url={settings.ANALYSIS_API_URL}")
-        analysis_data = ai_service.analyze_lab_report(signed_url, current_user["id"], patient_name, document_type)
-        if analysis_data:
-            supabase.table("medical_documents").update({
-                "ocr_extracted_text": json.dumps(analysis_data),
-                "status": "ready",
-            }).eq("id", doc["id"]).execute()
-            doc["status"] = "ready"
-            doc["ocr_extracted_text"] = json.dumps(analysis_data)
-            print(f"[ANALYSIS] Complete for doc {doc['id']}")
-        else:
-            print(f"[ANALYSIS] No data returned for doc {doc['id']}")
-            doc["analysis_result"] = None
-    except Exception as e:
-        print(f"[ANALYSIS] Exception for doc {doc['id']}: {e}")
-        doc["analysis_result"] = None
+    # Offload analysis to background task so the user doesn't hang
+    patient_name = f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip()
+    background_tasks.add_task(
+        run_document_analysis,
+        doc["id"],
+        signed_url,
+        current_user["id"],
+        patient_name,
+        document_type
+    )
 
     return _enrich_doc(doc)
 
