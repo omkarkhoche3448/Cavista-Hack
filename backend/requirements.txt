@@ -6,35 +6,10 @@ google-genai
 requests
 Pillow
 python-dotenv
-sqlalchemy[asyncio]
-asyncpg
-psycopg2-binary
-alembic
-pyjwt[crypto]
-bcrypt
-passlib[argon2]
 python-multipart
-openai-whisper
-torch
-numpy
-soundfile
 # Real-time / async
 websockets
-redis[hiredis]
-celery[redis]
-# LLM clients
-openai
-anthropic
-# FHIR export
-fhirclient
 # Supabase
 supabase
 python-jose[cryptography]
 email-validator
-# Security
-cryptography
-pyotp
-# Testing
-pytest
-pytest-asyncio
-httpx

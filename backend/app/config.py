@@ -5,10 +5,11 @@ dotenv.load_dotenv()
 
 
 class Settings(BaseSettings):
-    GOOGLE_API_KEY: str
+    GOOGLE_API_KEY: str = ""
     SUPABASE_URL: str
     SUPABASE_KEY: str
     SUPABASE_JWT_SECRET: str
+    DEEPGRAM_API_KEY: str = ""
 
     model_config = SettingsConfigDict(env_file=".env")
 
