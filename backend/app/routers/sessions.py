@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query, UploadFile, File
 from jose import jwt, JWTError
 from supabase import Client
+import requests
+import uuid
 
 from ..db import get_supabase
 from ..oauth2 import get_current_user, require_role, _get_signing_key
@@ -21,7 +23,7 @@ from ..models import (
     EndSessionRequest,
     TranscriptChunkIn,
 )
-from ..services import ai_service
+from ..services import ai_service, s3_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -218,6 +220,7 @@ async def create_session(
 
     # Create notification for patient
     notification = {
+        "id": str(uuid.uuid4()),
         "recipient_id": patient_id,
         "sender_id": doctor_id,
         "session_id": session["id"],
@@ -401,7 +404,7 @@ async def end_session(
     await manager.send_to_user(patient_id, "SESSION_ENDED", ws_payload)
     await manager.send_to_user(current_user["id"], "SESSION_ENDED", ws_payload)
 
-    # ── AI Pipeline ──
+    # ── AI Pipeline (Now using External API) ──
     try:
         # 1. Compile transcript
         chunks = (
@@ -425,15 +428,18 @@ async def end_session(
 
         # 2. Get document insights for context
         try:
+            # Try to fetch from 'pre_session_insights'. 
+            # If you are using the 'ai' schema, you may need to move this table to 'public' 
+            # or configure Supabase to expose the 'ai' schema.
             insights_data = (
-                supabase.from_("pre_session_insights")
+                supabase.table("pre_session_insights")
                 .select("summary, key_findings, medications_found, allergies_found")
                 .eq("session_id", body.session_id)
                 .execute()
             )
             document_insights = insights_data.data if insights_data.data else None
         except Exception as e:
-            logger.error(f"Failed to fetch pre-session insights: {e}")
+            logger.warning(f"Note: Could not fetch pre-session insights (Table might be in 'ai' schema or missing): {e}")
             document_insights = None
 
         # 3. Generate EMR draft
@@ -473,7 +479,7 @@ async def end_session(
         if diagnoses:
             icd_mappings = ai_service.map_icd_codes(diagnoses, transcript[:2000] if transcript else "")
             for mapping in icd_mappings:
-                supabase.table("icd_mappings").insert({
+                icd_payload = {
                     "session_id": body.session_id,
                     "emr_draft_id": draft_id,
                     "diagnosis_text": mapping.get("diagnosis_text", ""),
@@ -483,7 +489,8 @@ async def end_session(
                     "is_primary": mapping.get("is_primary", False),
                     "match_method": "llm",
                     "approval_status": "pending",
-                }).execute()
+                }
+                supabase.table("icd_mappings").insert(icd_payload).execute()
 
         # 5. Treatment suggestions
         treatments = ai_service.suggest_treatments(
@@ -491,8 +498,8 @@ async def end_session(
             patient_context=transcript[:2000] if transcript else "",
             current_medications=emr_content.get("medications"),
         )
-        for tx in treatments:
-            supabase.table("treatment_suggestions").insert({
+        treatment_data = [
+            {
                 "session_id": body.session_id,
                 "emr_draft_id": draft_id,
                 "suggestion_type": tx.get("suggestion_type"),
@@ -504,7 +511,11 @@ async def end_session(
                 "contraindications": tx.get("contraindications"),
                 "model_used": "gemini-2.0-flash",
                 "approval_status": "pending",
-            }).execute()
+            }
+            for tx in treatments
+        ]
+        if treatment_data:
+            supabase.table("treatment_suggestions").insert(treatment_data).execute()
 
         # 6. Patient-friendly summary
         summary = ai_service.generate_patient_summary(
@@ -680,29 +691,62 @@ async def upload_recording(
     session_id: str,
     file: UploadFile = File(...),
     current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
 ):
     """
-    Upload session recording and save locally in 's3' folder in the repo root.
+    Upload session recording to S3 and save URL in the database.
     """
-    # The repo root is one level up from the backend directory
-    # Backend started from /root/cavista/backend
-    repo_root = os.path.abspath(os.path.join(os.getcwd(), ".."))
-    recordings_dir = os.path.join(repo_root, "s3")
-
-    if not os.path.exists(recordings_dir):
-        os.makedirs(recordings_dir)
-
-    # Use original filename extension or default to webm
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else "webm"
-    file_path = os.path.join(recordings_dir, f"{session_id}.{file_ext}")
-
     try:
         content = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(content)
         
-        logger.info(f"Saved recording for session {session_id} to {file_path}")
-        return {"status": "success", "file_path": file_path}
+        # Determine file extension
+        file_ext = "webm"
+        if file.filename and "." in file.filename:
+            file_ext = file.filename.split(".")[-1]
+            
+        s3_key = f"recordings/{session_id}.{file_ext}"
+        
+        # Upload to S3
+        logger.info(f"Uploading recording for session {session_id} to S3...")
+        uploaded_key = s3_service.upload_file(
+            content=content,
+            key=s3_key,
+            content_type=file.content_type or "audio/webm"
+        )
+        
+        if not uploaded_key:
+            raise HTTPException(status_code=500, detail="Failed to upload recording to S3")
+
+        # Construct S3 URL (using virtual-host style)
+        recording_url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{uploaded_key}"
+        
+        # ── Update Session Record (Optional - Won't fail if column is missing) ──
+        try:
+            supabase.table("sessions").update({"recording_url": recording_url}).eq("id", session_id).execute()
+        except Exception as db_err:
+            logger.warning(f"Note: Recording URL not saved to DB (column might be missing): {db_err}")
+
+        # ── Notify External Analysis API ──
+        try:
+            analysis_url = f"{settings.ANALYSIS_API_URL}/ai/process-session"
+            requests.post(
+                analysis_url,
+                json={
+                    "session_id": session_id,
+                    "recording_url": recording_url,
+                    "doctor_id": current_user["id"]
+                },
+                timeout=10 # Fast timeout
+            )
+            logger.info(f"Notified analysis API for session {session_id}")
+        except Exception as api_err:
+            logger.error(f"Failed to notify analysis API: {api_err}")
+
+        return {
+            "status": "success",
+            "recording_url": recording_url,
+            "session_id": session_id
+        }
     except Exception as e:
-        logger.error(f"Failed to save recording: {e}")
+        logger.error(f"Failed to process recording upload: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save recording: {str(e)}")

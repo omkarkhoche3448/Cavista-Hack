@@ -128,6 +128,7 @@ class SessionResponse(BaseModel):
     ended_at: Optional[datetime] = None
     duration_seconds: Optional[int] = None
     is_emergency: bool = False
+    recording_url: Optional[str] = None
     created_at: datetime
     doctor_name: Optional[str] = None
     patient_name: Optional[str] = None

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/config/supabase";
 import { fetchProfile } from "@/services/authService";
 
@@ -9,38 +9,28 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const fetchedUserIdRef = useRef(null);
 
   const loadProfile = useCallback(async (currentSession) => {
     if (!currentSession?.user) {
       setProfile(null);
+      fetchedUserIdRef.current = null;
       return;
     }
 
-    // Skip if we already have this user's profile
-    // We compare strings to avoid object reference issues
-    setProfile(prev => {
-      if (prev && prev.id === currentSession.user.id) {
-        return prev;
-      }
-
-      // If different or first time, we need to fetch
-      // But we can't await inside setProfile, so we'll trigger the fetch outside
-      return prev;
-    });
-
-    // Actually, let's just do it simply but with a ref to avoid overlap
-    if (profile && profile.id === currentSession.user.id) {
+    // Skip if we already fetched for this user — ref avoids stale closure issues
+    if (fetchedUserIdRef.current === currentSession.user.id) {
       return;
     }
 
     try {
       const data = await fetchProfile(currentSession.access_token);
+      fetchedUserIdRef.current = currentSession.user.id;
       setProfile(data);
     } catch (err) {
       console.error("[AuthContext] Profile fetch failed:", err);
-      if (!profile) setProfile(null);
     }
-  }, [profile]);
+  }, []); // empty deps — uses ref, not state
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -61,6 +51,7 @@ export function AuthProvider({ children }) {
   }, [loadProfile]);
 
   const refreshProfile = useCallback(() => {
+    fetchedUserIdRef.current = null; // force re-fetch
     return loadProfile(session);
   }, [loadProfile, session]);
 

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET: str = ""
     ANALYSIS_API_URL: str = "https://cfwsxf61-8000.inc1.devtunnels.ms"
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

@@ -24,10 +24,10 @@ import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 
-export default function SessionPage() {
+export default function IndividualSession() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const { session: authSession, profile } = useAuth();
+  const { session: authSession } = useAuth();
   const { subscribe, send } = useWebSocket();
   const token = authSession?.access_token;
 
@@ -196,7 +196,10 @@ export default function SessionPage() {
       if (isRecordingRef.current && recognitionRef.current) {
         try {
           recognition.start();
-        } catch { }
+        } catch (err) {
+          // Silently ignore restart errors
+          console.debug("Speech recognition restart error:", err);
+        }
       }
     };
 
@@ -223,9 +226,6 @@ export default function SessionPage() {
     pauseAudioRecording();
   }, [pauseAudioRecording]);
 
-  const requestAiInsight = useCallback(() => {
-    send("REQUEST_AI_INSIGHT", { session_id: sessionId });
-  }, [send, sessionId]);
 
   async function handleEndSession() {
     setIsEnding(true);
@@ -543,15 +543,6 @@ export default function SessionPage() {
                 </div>
                 Assistant Core
               </CardTitle>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={requestAiInsight}
-                className="h-7 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/10 hover:text-primary transition-all rounded-full px-3"
-                disabled={transcriptChunks.length === 0}
-              >
-                Sync Analysis
-              </Button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-3 space-y-4">

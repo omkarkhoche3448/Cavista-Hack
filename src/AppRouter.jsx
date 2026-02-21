@@ -1,94 +1,184 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Home from "./pages/Home.jsx";
 import DefaultLayout from "./components/layout/DefaultLayout";
 import {
   LoginPage,
   SignupPage,
   AuthCallback,
   ProtectedRoute,
+  GuestRoute,
   RoleRoute,
 } from "@/features/auth";
 import RoleRedirect from "./features/auth/RoleRedirect";
-import { DoctorDashboard, SessionPage, PostSessionReview } from "@/features/doctor-dashboard";
-import { PatientDashboard, PatientSessionPage } from "@/features/patient-dashboard";
-import PatientDashboardLayout from "@/features/patient-dashboard/components/PatientDashboardLayout";
-import MyHealthPage from "@/features/patient-dashboard/components/health/MyHealthPage";
-import MyDocumentsPage from "@/features/patient-dashboard/components/documents/MyDocumentsPage";
+import DoctorCall from "./pages/doctor/DoctorCallPage.jsx";
+import DoctorDashboard from "./pages/doctor/DoctorDashboard.jsx";
+import AllSessions from "./pages/doctor/Sessions.jsx";
+import AllPatients from "./pages/doctor/Patients.jsx";
+import IndividualPatient from "./pages/doctor/IndividualPatient.jsx";
+import PostSessionReview from "./pages/doctor/ReviewSession.jsx";
+import DoctorProfile from "./pages/doctor/DoctorProfilePage.jsx";
+import PatientDashboard from "./pages/patient/PatientDashboard.jsx";
+import PatientProfile from "./pages/patient/PatientProfilePage.jsx";  
+import Home from "./pages/Home.jsx";
+import IndividualSession from "./pages/doctor/IndividualSession";
+import IndividualSessionSummary from "./pages/patient/IndividualSession";
+import PatientCall from "./pages/patient/PatientCallPage.jsx";
+import Uploads from "./pages/patient/Uploads";
+import PatientAllSessions from "./pages/patient/Sessions.jsx";
+const ProtectedDoctorRoute = ({ children }) => (
+  <ProtectedRoute>
+    <RoleRoute allowedRole="doctor">{children}</RoleRoute>
+  </ProtectedRoute>
+);
+
+const ProtectedPatientRoute = ({ children }) => (
+  <ProtectedRoute>
+    <RoleRoute allowedRole="patient">{children}</RoleRoute>
+  </ProtectedRoute>
+);
 
 export default function AppRouter() {
   return (
     <Routes>
-      {/* Public routes */}
+      {/* Public Routes */}
+      <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/home" element={<DefaultLayout><Home /></DefaultLayout>} />
-      <Route path="/login" element={<DefaultLayout><LoginPage /></DefaultLayout>} />
-      <Route path="/signup" element={<DefaultLayout><SignupPage /></DefaultLayout>} />
+      <Route path="/login" element={<DefaultLayout><GuestRoute><LoginPage /></GuestRoute></DefaultLayout>} />
+      <Route path="/signup" element={<DefaultLayout><GuestRoute><SignupPage /></GuestRoute></DefaultLayout>} />
       <Route path="/auth/callback" element={<DefaultLayout><AuthCallback /></DefaultLayout>} />
 
-      {/* Doctor dashboard */}
+      {/* Doctor Routes */}
       <Route
         path="/doctor/dashboard"
         element={
           <DefaultLayout>
-            <ProtectedRoute>
-              <RoleRoute allowedRole="doctor">
-                <DoctorDashboard />
-              </RoleRoute>
-            </ProtectedRoute>
+            <ProtectedDoctorRoute>
+              <DoctorDashboard />
+            </ProtectedDoctorRoute>
           </DefaultLayout>
         }
       />
-
-      {/* Patient dashboard — nested with sidebar */}
       <Route
-        path="/patient"
+        path='/doctor/call/:sessionId'
         element={
-          <ProtectedRoute>
-            <RoleRoute allowedRole="patient">
-              <PatientDashboardLayout />
-            </RoleRoute>
-          </ProtectedRoute>
+          <DefaultLayout>
+            <ProtectedDoctorRoute>
+              <DoctorCall />
+            </ProtectedDoctorRoute>
+          </DefaultLayout>
         }
-      >
-        <Route path="dashboard" element={<PatientDashboard />} />
-        <Route path="health" element={<MyHealthPage />} />
-        <Route path="documents" element={<MyDocumentsPage />} />
-        <Route index element={<Navigate to="dashboard" replace />} />
-      </Route>
-
-      {/* Generic dashboard redirect */}
+      />
+      <Route
+        path="/doctor/sessions"
+        element={
+          <DefaultLayout>
+            <ProtectedDoctorRoute>
+              <AllSessions />
+            </ProtectedDoctorRoute>
+          </DefaultLayout>
+        }
+      />
+      <Route
+        path="/doctor/patients"
+        element={
+          <DefaultLayout>
+            <ProtectedDoctorRoute>
+              <AllPatients />
+            </ProtectedDoctorRoute>
+          </DefaultLayout>
+        }
+      />
       <Route
         path="/doctor/session/:sessionId"
         element={
-          <ProtectedRoute>
-            <RoleRoute allowedRole="doctor">
-              <SessionPage />
-            </RoleRoute>
-          </ProtectedRoute>
+          <ProtectedDoctorRoute>
+            <IndividualSession />
+          </ProtectedDoctorRoute>
         }
       />
-
+      <Route
+        path="/doctor/patient/:patientId"
+        element={
+          <ProtectedDoctorRoute>
+            <IndividualPatient />
+          </ProtectedDoctorRoute>
+        }
+      />
       <Route
         path="/doctor/review/:sessionId"
         element={
-          <ProtectedRoute>
-            <RoleRoute allowedRole="doctor">
-              <PostSessionReview />
-            </RoleRoute>
-          </ProtectedRoute>
+          <ProtectedDoctorRoute>
+            <PostSessionReview />
+          </ProtectedDoctorRoute>
         }
       />
+      <Route
+        path="/doctor/profile"
+        element={
+          <ProtectedDoctorRoute>
+            <DoctorProfile />
+          </ProtectedDoctorRoute>
+        }
+      />
+      {/* Patient Routes
+      <Route
+        path="/patient"
+        element={
+          <ProtectedPatientRoute>
+            <PatientDashboardLayout />
+          </ProtectedPatientRoute>
+        }
+      > */}
 
+      <Route
+        path="/patient/dashboard"
+        element={
+          <ProtectedPatientRoute>
+            <PatientDashboard />
+          </ProtectedPatientRoute>
+        }
+      />
+      <Route
+        path="/patient/call/:sessionId"
+        element={
+          <ProtectedPatientRoute>
+            <PatientCall />
+          </ProtectedPatientRoute>
+        }
+      />
+      <Route
+        path="/patient/sessions"
+        element={
+          <ProtectedPatientRoute>
+            <PatientAllSessions />
+          </ProtectedPatientRoute>
+        }
+      />
       <Route
         path="/patient/session/:sessionId"
         element={
-          <ProtectedRoute>
-            <RoleRoute allowedRole="patient">
-              <PatientSessionPage />
-            </RoleRoute>
-          </ProtectedRoute>
+          <ProtectedPatientRoute>
+            <IndividualSessionSummary />
+          </ProtectedPatientRoute>
+        }
+      />
+      <Route
+        path="/patient/uploads"
+        element={
+          <ProtectedPatientRoute>
+            <Uploads />
+          </ProtectedPatientRoute>
+        }
+      />
+      <Route
+        path="/patient/profile"
+        element={
+          <ProtectedPatientRoute>
+            <PatientProfile />
+          </ProtectedPatientRoute>
         }
       />
 
+      {/* Dashboard Redirect */}
       <Route
         path="/dashboard"
         element={
@@ -97,8 +187,7 @@ export default function AppRouter() {
           </ProtectedRoute>
         }
       />
-
-      <Route path="/" element={<Navigate to="/home" replace />} />
+      <Route index element={<Navigate to="dashboard" replace />} />
     </Routes>
   );
 }

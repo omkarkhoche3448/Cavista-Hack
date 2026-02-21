@@ -108,10 +108,10 @@ CREATE TYPE audit_action AS ENUM (
 -- =============================================================================
 -- SCHEMA NAMESPACES
 -- =============================================================================
-CREATE SCHEMA IF NOT EXISTS emr;
+CREATE SCHEMA IF NOT EXISTS public;
 CREATE SCHEMA IF NOT EXISTS audit;
-CREATE SCHEMA IF NOT EXISTS ai;
-CREATE SCHEMA IF NOT EXISTS comms;
+CREATE SCHEMA IF NOT EXISTS public;
+CREATE SCHEMA IF NOT EXISTS public;
 
 -- =============================================================================
 -- 1. USERS
@@ -249,6 +249,7 @@ CREATE TABLE public.sessions (
     deleted_at              TIMESTAMPTZ,
     created_by              UUID REFERENCES public.users(id),
     modified_by             UUID REFERENCES public.users(id),
+    recording_url           TEXT,
     CONSTRAINT chk_session_doctor_patient CHECK (doctor_id <> patient_id)
 );
 
