@@ -70,3 +70,22 @@ export async function endSession(token, { sessionId, sessionNotes }) {
 export async function getTranscript(token, sessionId) {
   return authFetch(`${SESSIONS_API}/${sessionId}/transcript`, {}, token);
 }
+
+export async function uploadRecording(token, sessionId, blob) {
+  const formData = new FormData();
+  formData.append("file", blob, `session-${sessionId}.webm`);
+
+  const res = await fetch(`${SESSIONS_API}/${sessionId}/recording`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Upload failed");
+  }
+  return res.json();
+}

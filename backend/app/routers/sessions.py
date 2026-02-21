@@ -4,8 +4,9 @@ Session Router — CRUD operations for clinical sessions + WebSocket endpoint.
 
 import json
 import logging
+import os
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query, UploadFile, File
 from jose import jwt, JWTError
 from supabase import Client
 
@@ -672,3 +673,36 @@ def get_session_notifications(
         .execute()
     )
     return result.data or []
+
+
+@router.post("/{session_id}/recording")
+async def upload_recording(
+    session_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_role("doctor")),
+):
+    """
+    Upload session recording and save locally in 's3' folder in the repo root.
+    """
+    # The repo root is one level up from the backend directory
+    # Backend started from /root/cavista/backend
+    repo_root = os.path.abspath(os.path.join(os.getcwd(), ".."))
+    recordings_dir = os.path.join(repo_root, "s3")
+
+    if not os.path.exists(recordings_dir):
+        os.makedirs(recordings_dir)
+
+    # Use original filename extension or default to webm
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "webm"
+    file_path = os.path.join(recordings_dir, f"{session_id}.{file_ext}")
+
+    try:
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        logger.info(f"Saved recording for session {session_id} to {file_path}")
+        return {"status": "success", "file_path": file_path}
+    except Exception as e:
+        logger.error(f"Failed to save recording: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save recording: {str(e)}")

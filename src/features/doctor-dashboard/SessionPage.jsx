@@ -18,7 +18,7 @@ import {
   User,
   Stethoscope,
 } from "lucide-react";
-import { getSession, endSession } from "@/services/sessionService";
+import { getSession, endSession, uploadRecording } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
@@ -38,6 +38,7 @@ export default function SessionPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [duration, setDuration] = useState(0);
 
   const recognitionRef = useRef(null);
   const isRecordingRef = useRef(false);
@@ -49,7 +50,6 @@ export default function SessionPage() {
     startRecording: startAudioRecording,
     pauseRecording: pauseAudioRecording,
     stopRecording: stopAudioRecording,
-    saveRecording,
   } = useAudioRecorder();
 
   // Fetch session data
@@ -76,6 +76,25 @@ export default function SessionPage() {
     }
     load();
   }, [token, sessionId]);
+
+  // Consultation Timer
+  useEffect(() => {
+    let interval;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   // Listen for real-time events
   useEffect(() => {
@@ -208,15 +227,19 @@ export default function SessionPage() {
   }, [send, sessionId]);
 
   async function handleEndSession() {
-    if (!confirm("Are you sure you want to end this session? This will trigger AI analysis.")) return;
     setIsEnding(true);
     stopRecording();
 
     try {
-      // Stop and save audio recording
+      // Stop and upload audio recording to local 's3' folder via backend
       const audioResult = await stopAudioRecording();
       if (audioResult?.blob) {
-        saveRecording(audioResult.blob, `session-${sessionId}`);
+        try {
+          await uploadRecording(token, sessionId, audioResult.blob);
+          console.log("Recording saved to s3 folder successfully");
+        } catch (uploadErr) {
+          console.error("Failed to upload recording to s3:", uploadErr);
+        }
       }
 
       await endSession(token, { sessionId, sessionNotes: "" });
@@ -302,46 +325,61 @@ export default function SessionPage() {
       {/* Center — Transcript */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Session Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              Session with {sessionData.patient_name}
-              <Badge variant="success">Active</Badge>
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {sessionData.chief_complaint || "General consultation"}
-            </p>
+        <div className="flex items-center justify-between mb-6 bg-card p-4 rounded-xl border border-border shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+              <User className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold tracking-tight">
+                  {sessionData.patient_name}
+                </h2>
+                <Badge variant="success" className="animate-pulse">Active</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Stethoscope className="w-3 h-3" />
+                {sessionData.chief_complaint || "General consultation"}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {!isRecording ? (
-              <Button onClick={startRecording} className="gap-2">
-                <Mic className="w-4 h-4" />
-                Start Recording
-              </Button>
-            ) : (
-              <Button
-                onClick={stopRecording}
-                variant="outline"
-                className="gap-2 border-red-300 text-red-600 hover:bg-red-50"
-              >
-                <MicOff className="w-4 h-4" />
-                Pause Recording
-              </Button>
-            )}
-            <Button
-              onClick={handleEndSession}
-              variant="destructive"
-              disabled={isEnding}
-              className="gap-2"
-            >
-              {isEnding ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="flex items-center gap-4">
+            <div className="text-right mr-4 hidden sm:block">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Duration</p>
+              <p className="text-2xl font-mono font-bold text-primary">{formatDuration(duration)}</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {!isRecording ? (
+                <Button onClick={startRecording} className="gap-2 rounded-full shadow-lg shadow-primary/20 bg-primary hover:scale-105 transition-transform">
+                  <Mic className="w-4 h-4" />
+                  Start Recording
+                </Button>
               ) : (
-                <StopCircle className="w-4 h-4" />
+                <Button
+                  onClick={stopRecording}
+                  variant="outline"
+                  className="gap-2 rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all"
+                >
+                  <MicOff className="w-4 h-4" />
+                  Pause
+                </Button>
               )}
-              {isEnding ? "Processing..." : "End Session"}
-            </Button>
+              <Button
+                onClick={handleEndSession}
+                variant="destructive"
+                disabled={isEnding}
+                className="gap-2 rounded-full shadow-lg shadow-destructive/20 hover:scale-105 transition-transform"
+              >
+                {isEnding ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <StopCircle className="w-4 h-4" />
+                )}
+                {isEnding ? "Processing..." : "Finish"}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -356,43 +394,64 @@ export default function SessionPage() {
         )}
 
         {/* Transcript Area */}
-        <Card className="flex-1 overflow-hidden flex flex-col">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Live Transcript</CardTitle>
+        <Card className="flex-1 overflow-hidden flex flex-col relative group border-none shadow-none bg-transparent">
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/5 pointer-events-none opacity-50" />
+
+          <CardHeader className="pb-2 bg-background/50 backdrop-blur-sm border-b relative z-10">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary" />
+              Intelligence Core
+            </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto space-y-3">
-            {transcriptChunks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <Mic className="w-12 h-12 mb-4 opacity-30" />
-                <p className="text-sm">Start recording to see the live transcript</p>
-              </div>
-            ) : (
-              transcriptChunks.map((chunk, i) => (
-                <div
-                  key={i}
-                  className={`flex gap-3 ${chunk.speaker_role === "doctor" ? "justify-end" : "justify-start"
-                    }`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${chunk.speaker_role === "doctor"
-                      ? "bg-primary/10 text-foreground"
-                      : "bg-muted text-foreground"
-                      }`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      {chunk.speaker_role === "doctor" ? (
-                        <Stethoscope className="w-3 h-3 text-primary" />
-                      ) : (
-                        <User className="w-3 h-3 text-muted-foreground" />
-                      )}
-                      <span className="text-xs font-medium capitalize">
-                        {chunk.speaker_role}
-                      </span>
-                    </div>
-                    <p>{chunk.text || chunk.raw_text}</p>
+
+          <CardContent className="flex-1 flex flex-col items-center justify-center space-y-8 relative z-10">
+            {isRecording ? (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-75" />
+                  <div className="absolute inset-[-20px] rounded-full border border-primary/20 animate-[spin_4s_linear_infinite]" />
+                  <div className="absolute inset-[-40px] rounded-full border border-primary/10 animate-[spin_8s_linear_infinite_reverse]" />
+
+                  <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary shadow-inner border border-primary/20">
+                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse" />
+                    <Mic className="w-12 h-12 relative z-10" />
                   </div>
                 </div>
-              ))
+
+                {/* Animated Waveform Blocks */}
+                <div className="flex items-end gap-1 h-8">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(i => (
+                    <div
+                      key={i}
+                      className="w-1.5 bg-primary/40 rounded-full animate-waveform"
+                      style={{
+                        height: `${20 + Math.random() * 80}%`,
+                        animationDelay: `${i * 0.1}s`,
+                        opacity: 0.3 + (i / 15) * 0.7
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div className="text-center space-y-2">
+                  <h3 className="text-2xl font-black tracking-tight text-foreground">Listening...</h3>
+                  <p className="text-muted-foreground max-w-sm mx-auto font-medium leading-relaxed">
+                    SEVAमित्र is capturing and processing clinical audio in real-time. Full EMR draft will be available upon completion.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center space-y-6">
+                <div className="w-24 h-24 rounded-3xl bg-muted/50 flex items-center justify-center text-muted-foreground border border-border group-hover:border-primary/20 transition-colors duration-500">
+                  <Mic className="w-10 h-10 opacity-20" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-muted-foreground">Ready for Consultation</h3>
+                  <p className="text-sm text-muted-foreground/60 max-w-[240px]">
+                    Click the "Start Recording" button to begin the clinical session.
+                  </p>
+                </div>
+              </div>
             )}
             <div ref={transcriptEndRef} />
           </CardContent>
