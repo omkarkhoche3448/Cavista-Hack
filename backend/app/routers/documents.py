@@ -356,13 +356,34 @@ async def share_documents(
         shared.append(doc.data)
 
     doctor_id = session.data["doctor_id"]
+
+    # Build enriched document list including parsed analysis & presigned URLs
+    enriched_docs = []
+    for d in shared:
+        doc_entry = {
+            "id": d["id"],
+            "title": d["title"],
+            "file_name": d["file_name"],
+            "type": d["document_type"],
+            "document_type": d["document_type"],
+            "status": "ready",
+        }
+        # Attach presigned URL so the doctor can view the PDF
+        if d.get("storage_key"):
+            doc_entry["storage_url"] = s3_service.generate_presigned_url(d["storage_key"])
+        # Attach parsed analysis so the doctor sees content immediately
+        raw = d.get("ocr_extracted_text")
+        if raw:
+            try:
+                doc_entry["analysis_result"] = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                doc_entry["analysis_result"] = None
+        enriched_docs.append(doc_entry)
+
     ws_payload = {
         "session_id": body.session_id,
         "patient_id": current_user["id"],
-        "documents": [
-            {"id": d["id"], "title": d["title"], "file_name": d["file_name"], "type": d["document_type"]}
-            for d in shared
-        ],
+        "documents": enriched_docs,
     }
     await manager.send_to_user(doctor_id, "FILE_SHARED", ws_payload)
     await manager.send_to_user(current_user["id"], "FILE_SHARED", ws_payload)

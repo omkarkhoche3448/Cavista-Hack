@@ -21,7 +21,7 @@ import PatientDashboard from "./pages/patient/PatientDashboard.jsx";
 import PatientProfile from "./pages/patient/PatientProfilePage.jsx";
 import Home from "./pages/Home.jsx";
 import IndividualSession from "./pages/doctor/IndividualSession";
-import IndividualSessionSummary from "./pages/patient/IndividualSession";
+import PatientSessionPage from "./pages/patient/PatientSessionPage";
 import PatientCall from "./pages/patient/PatientCallPage.jsx";
 import Uploads from "./pages/patient/Uploads";
 import PatientAllSessions from "./pages/patient/Sessions.jsx";
@@ -180,7 +180,7 @@ export default function AppRouter() {
         path="/patient/session/:sessionId"
         element={
           <ProtectedPatientRoute>
-            <IndividualSessionSummary />
+            <PatientSessionPage />
           </ProtectedPatientRoute>
         }
       />

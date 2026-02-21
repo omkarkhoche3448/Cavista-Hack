@@ -504,14 +504,16 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
     except Exception:
         pass
 
-    # Fetch patient info once so we can use name/gender in AI prompts and notify them
+    # Fetch patient + doctor info for AI prompts and notifications
     patient_id = None
     patient_name = "Unknown"
     patient_gender = "Unknown"
+    patient_age = None
+    doctor_name = "Unknown"
     try:
         _sess = (
             supabase.table("sessions")
-            .select("patient_id, patient:users!patient_id(first_name, last_name, gender)")
+            .select("patient_id, patient:users!patient_id(first_name, last_name, gender, date_of_birth), doctor:users!doctor_id(first_name, last_name)")
             .eq("id", session_id)
             .single()
             .execute()
@@ -521,8 +523,19 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
             pat = _sess.data.get("patient", {})
             patient_name = f"{pat.get('first_name', '')} {pat.get('last_name', '')}".strip() or "Unknown"
             patient_gender = pat.get("gender", "Unknown")
+            dob = pat.get("date_of_birth")
+            if dob:
+                from datetime import date as _date
+                try:
+                    born = _date.fromisoformat(dob)
+                    today = _date.today()
+                    patient_age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+                except Exception:
+                    pass
+            doc = _sess.data.get("doctor", {})
+            doctor_name = f"{doc.get('first_name', '')} {doc.get('last_name', '')}".strip() or "Unknown"
     except Exception as e:
-        logger.warning(f"Error fetching patient info for AI pipeline: {e}")
+        logger.warning(f"Error fetching session info for AI pipeline: {e}")
     try:
         # 1. Compile transcript
         chunks = (
@@ -557,20 +570,47 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
                 .eq("session_id", session_id)
                 .execute()
             )
-            document_insights = insights_data.data or []
+            raw_insights = insights_data.data or []
         except Exception as e:
             logger.warning(f"Could not fetch pre-session insights: {e}")
-            document_insights = []
+            raw_insights = []
+
+        # Flatten structured insights into summary strings for the external API
+        report_summaries = []
+        for insight in raw_insights:
+            parts = []
+            if insight.get("summary"):
+                parts.append(insight["summary"])
+            if insight.get("key_findings"):
+                findings = insight["key_findings"]
+                if isinstance(findings, list):
+                    parts.append("Key findings: " + "; ".join(str(f) for f in findings))
+                elif isinstance(findings, str):
+                    parts.append(f"Key findings: {findings}")
+            if insight.get("medications_found"):
+                meds = insight["medications_found"]
+                if isinstance(meds, list):
+                    parts.append("Medications: " + ", ".join(str(m) for m in meds))
+            if insight.get("allergies_found"):
+                allergies = insight["allergies_found"]
+                if isinstance(allergies, list):
+                    parts.append("Allergies: " + ", ".join(str(a) for a in allergies))
+            if parts:
+                report_summaries.append(". ".join(parts))
         
-        print(f"[AI_PIPELINE] Transcript length: {len(transcript)}")
+        print(f"[AI_PIPELINE] Transcript length: {len(transcript)}, report_summaries: {len(report_summaries)}")
         # 4. Generate EMR draft (External AI Call)
         emr_content = ai_service.generate_emr_draft(
             audio_url=audio_url,
             transcript=transcript,
             chief_complaint=chief_complaint,
-            document_insights=document_insights,
+            document_insights=report_summaries,
             patient_name=patient_name,
             patient_gender=patient_gender,
+            patient_age=patient_age,
+            doctor_id=doctor_id,
+            doctor_name=doctor_name,
+            patient_id=patient_id,
         )
 
         # 5. Save EMR draft
