@@ -36,6 +36,14 @@ export async function listSessions(token, statusFilter = null) {
   return authFetch(`${SESSIONS_API}${params}`, {}, token);
 }
 
+export async function listPatients(token) {
+  return authFetch(`${SESSIONS_API}/patients`, {}, token);
+}
+
+export async function getPatient(token, patientId) {
+  return authFetch(`${SESSIONS_API}/patients/${patientId}`, {}, token);
+}
+
 export async function getSession(token, sessionId) {
   return authFetch(`${SESSIONS_API}/${sessionId}`, {}, token);
 }

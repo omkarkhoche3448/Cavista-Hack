@@ -430,7 +430,7 @@ export default function DoctorDashboard() {
               <CalendarDays className="w-4 h-4" />
               Sessions
             </Button>
-            <Button variant="outline" className="rounded-xl px-5 gap-2 font-semibold">
+            <Button variant="outline" className="rounded-xl px-5 gap-2 font-semibold" onClick={() => navigate("/doctor/patients")}>
               <Users className="w-4 h-4" />
               Patients
             </Button>
