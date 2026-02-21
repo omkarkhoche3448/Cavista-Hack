@@ -269,54 +269,80 @@ export default function SessionPage() {
   return (
     <div className="flex gap-4 h-[calc(100vh-10rem)]">
       {/* Left Sidebar — Documents */}
-      <div className="w-72 flex-shrink-0 flex flex-col">
-        <Card className="flex-1 overflow-hidden flex flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Patient Documents
+      <div className="w-80 flex-shrink-0 flex flex-col gap-4 animate-in slide-in-from-left duration-500">
+        <Card className="flex-1 overflow-hidden flex flex-col border-primary/10 shadow-sm bg-card/50 backdrop-blur-sm">
+          <CardHeader className="pb-3 border-b bg-muted/30">
+            <CardTitle className="text-sm flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                Clinical Registry
+              </span>
+              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0">
+                {documents.length} Files
+              </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto space-y-2">
+          <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
             {documents.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                Waiting for patient to share documents...
-              </p>
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-40">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-medium max-w-[140px]">Awaiting patient data synchronization...</p>
+              </div>
             ) : (
               documents.map((doc, i) => (
                 <div
                   key={doc.id || i}
-                  className="p-2 rounded-lg border border-border hover:bg-muted/50 cursor-pointer text-xs"
+                  className="group p-3 rounded-xl border border-border bg-background/50 hover:border-primary/30 hover:shadow-md transition-all duration-300 cursor-pointer relative overflow-hidden"
                 >
-                  <p className="font-medium truncate">{doc.title || doc.file_name}</p>
-                  <p className="text-muted-foreground mt-0.5">
-                    {doc.type || doc.document_type}
-                  </p>
+                  <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ChevronRight className="w-3 h-3 text-primary" />
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/5 text-primary group-hover:bg-primary/10 transition-colors">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-xs truncate group-hover:text-primary transition-colors">{doc.title || doc.file_name}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-tighter font-semibold">
+                        {doc.type || doc.document_type || "General Document"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ))
             )}
 
             {insights.length > 0 && (
-              <>
-                <Separator className="my-3" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  AI Insights
-                </p>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2 px-1">
+                  <div className="h-px flex-1 bg-border" />
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Registry Insights</p>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
                 {insights.map((ins, i) => (
                   <div
                     key={ins.id || i}
-                    className="p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs"
+                    className="p-3 rounded-xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 shadow-inner space-y-2"
                   >
-                    <p className="font-medium">{ins.summary || ins.insight?.summary || "Analyzing..."}</p>
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-3 h-3 text-primary" />
+                      <p className="font-bold text-[11px] text-primary uppercase">AI Synthesis</p>
+                    </div>
+                    <p className="text-[11px] leading-relaxed font-medium text-foreground/80 italic">
+                      "{ins.summary || ins.insight?.summary || "Analyzing synchronized record..."}"
+                    </p>
                     {(ins.risk_flags || ins.insight?.risk_flags)?.map((flag, fi) => (
-                      <div key={fi} className="flex items-center gap-1 mt-1">
-                        <AlertTriangle className="w-3 h-3 text-yellow-500" />
-                        <span className="text-muted-foreground">{flag.flag}</span>
+                      <div key={fi} className="flex items-start gap-2 p-1.5 rounded-lg bg-destructive/5 border border-destructive/10 animate-in fade-in duration-300">
+                        <AlertTriangle className="w-3 h-3 text-destructive mt-0.5" />
+                        <span className="text-[10px] text-destructive font-bold uppercase tracking-tight">{flag.flag}</span>
                       </div>
                     ))}
                   </div>
                 ))}
-              </>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -458,84 +484,97 @@ export default function SessionPage() {
         </Card>
       </div>
 
-      {/* Right Sidebar — AI Summary */}
-      <div className="w-72 flex-shrink-0 flex flex-col">
-        <Card className="flex-1 overflow-hidden flex flex-col">
-          <CardHeader className="pb-3">
+      {/* Right Sidebar — AI Assistant */}
+      <div className="w-80 flex-shrink-0 flex flex-col animate-in slide-in-from-right duration-500">
+        <Card className="flex-1 overflow-hidden flex flex-col border-primary/10 shadow-sm bg-card/50 backdrop-blur-sm">
+          <CardHeader className="pb-3 border-b bg-muted/30">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Brain className="w-4 h-4" />
-                AI Assistant
+                <div className="relative">
+                  <Brain className="w-4 h-4 text-primary" />
+                  <div className="absolute inset-0 bg-primary animate-ping opacity-20" />
+                </div>
+                Assistant Core
               </CardTitle>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={requestAiInsight}
-                className="h-7 text-xs"
+                className="h-7 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/10 hover:text-primary transition-all rounded-full px-3"
                 disabled={transcriptChunks.length === 0}
               >
-                Refresh
+                Sync Analysis
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto space-y-3">
+          <CardContent className="flex-1 overflow-y-auto p-3 space-y-4">
             {!aiInsight ? (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                AI insights will appear here during the session. Click &quot;Refresh&quot; to get real-time analysis.
-              </p>
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-40">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <Brain className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-medium max-w-[140px]">Initiating AI assistant synchronization...</p>
+              </div>
             ) : (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-5 animate-in fade-in duration-500">
                 {aiInsight.key_observations?.length > 0 && (
-                  <div>
-                    <p className="font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                      Key Observations
-                    </p>
-                    {aiInsight.key_observations.map((obs, i) => (
-                      <div key={i} className="flex items-start gap-1.5 mb-1.5">
-                        <ChevronRight className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                        <span>{obs}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Key Observations</p>
+                    <div className="space-y-1.5">
+                      {aiInsight.key_observations.map((obs, i) => (
+                        <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-background border border-border hover:border-primary/20 transition-colors">
+                          <div className="w-1 h-1 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                          <span className="text-[11px] leading-tight font-medium">{obs}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {aiInsight.suggested_questions?.length > 0 && (
-                  <div>
-                    <p className="font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                      Suggested Questions
-                    </p>
-                    {aiInsight.suggested_questions.map((q, i) => (
-                      <div key={i} className="p-2 rounded bg-muted/50 mb-1.5">
-                        {q}
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Diagnostic Prompts</p>
+                    <div className="space-y-1.5">
+                      {aiInsight.suggested_questions.map((q, i) => (
+                        <div key={i} className="group p-2.5 rounded-xl bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-all cursor-pointer relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-1 opacity-20">
+                            <ChevronRight className="w-3 h-3" />
+                          </div>
+                          <p className="text-[11px] leading-tight font-bold text-primary italic">"{q}"</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {aiInsight.potential_concerns?.length > 0 && (
-                  <div>
-                    <p className="font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                      Potential Concerns
-                    </p>
-                    {aiInsight.potential_concerns.map((c, i) => (
-                      <div key={i} className="flex items-start gap-1.5 mb-1.5">
-                        <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
-                        <span>{c}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Critical Red-Flags</p>
+                    <div className="space-y-1.5">
+                      {aiInsight.potential_concerns.map((c, i) => (
+                        <div key={i} className="flex items-start gap-2 p-2.5 rounded-xl bg-destructive/5 border border-destructive/10">
+                          <AlertTriangle className="w-3 h-3 text-destructive mt-0.5 flex-shrink-0" />
+                          <span className="text-[11px] leading-tight font-extrabold text-destructive flex-1">{c}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {aiInsight.differential_diagnoses?.length > 0 && (
-                  <div>
-                    <p className="font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                      Differential Diagnoses
-                    </p>
-                    {aiInsight.differential_diagnoses.map((d, i) => (
-                      <Badge key={i} variant="outline" className="mr-1 mb-1">
-                        {d}
-                      </Badge>
-                    ))}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Differential Matrix</p>
+                    <div className="flex flex-wrap gap-1 px-1">
+                      {aiInsight.differential_diagnoses.map((d, i) => (
+                        <Badge
+                          key={i}
+                          variant="secondary"
+                          className="bg-muted border border-border text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md hover:bg-primary hover:text-white transition-colors cursor-default"
+                        >
+                          {d}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

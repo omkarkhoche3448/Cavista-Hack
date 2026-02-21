@@ -193,3 +193,15 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+@utility animate-waveform {
+  animation: waveform 1.2s ease-in-out infinite;
+}
+
+@keyframes waveform {
+  0%, 100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
