@@ -312,6 +312,28 @@ class NotificationResponse(BaseModel):
     created_at: datetime
 
 
+# ── Doctor Notes ──
+
+class NoteCreate(BaseModel):
+    patient_id: str
+    session_id: Optional[str] = None
+    notes: List[str] = Field(..., min_length=1)
+
+
+class NoteUpdate(BaseModel):
+    notes: List[str] = Field(..., min_length=1)
+
+
+class NoteResponse(BaseModel):
+    id: str
+    doctor_id: str
+    patient_id: str
+    session_id: Optional[str] = None
+    notes: List[str]
+    created_at: datetime
+    updated_at: datetime
+
+
 # ── WebSocket Events ──
 
 class WSMessage(BaseModel):

@@ -434,10 +434,6 @@ export default function DoctorDashboard() {
               <Users className="w-4 h-4" />
               Patients
             </Button>
-            <Button variant="outline" className="rounded-xl px-5 gap-2 font-semibold">
-              <FileBarChart className="w-4 h-4" />
-              Reports
-            </Button>
           </div>
         </div>
       </div>

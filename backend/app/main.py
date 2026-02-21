@@ -5,6 +5,7 @@ from .routers import auth
 from .routers import sessions
 from .routers import documents
 from .routers import emr
+from .routers import notes
 
 app = FastAPI(title="SEVAमित्र API", version="1.0.0")
 
@@ -24,6 +25,7 @@ app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(documents.router)
 app.include_router(emr.router)
+app.include_router(notes.router)
 
 
 @app.get("/")
