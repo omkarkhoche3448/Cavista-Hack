@@ -300,15 +300,18 @@ async def approve_patient_summary(
 
     if patient_id:
         # Create notification
-        supabase.table("notifications").insert({
-            "recipient_id": patient_id,
-            "sender_id": current_user["id"],
-            "session_id": summary.data["session_id"],
-            "notification_type": "patient_summary_available",
-            "title": "Visit Summary Available",
-            "body": "Your doctor has shared a summary of your recent visit.",
-            "payload": {"session_id": summary.data["session_id"]},
-        }).execute()
+        try:
+            supabase.table("notifications").insert({
+                "recipient_id": patient_id,
+                "sender_id": current_user["id"],
+                "session_id": summary.data["session_id"],
+                "notification_type": "patient_summary_available",
+                "title": "Visit Summary Available",
+                "body": "Your doctor has shared a summary of your recent visit.",
+                "payload": {"session_id": summary.data["session_id"]},
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Failed to persist notification: {e}")
 
         # WS notification
         await manager.send_to_user(patient_id, "NOTIFICATION", {
