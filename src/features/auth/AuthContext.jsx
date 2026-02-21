@@ -48,7 +48,7 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     isAuthenticated: !!session,
-    role: profile?.role ?? null,
+    role: profile?.role ?? user?.user_metadata?.role ?? null,
     refreshProfile: () => loadProfile(session),
   };
 

@@ -1,4 +1,5 @@
 import { ArrowRight, Mic, Brain, FileText, Users, Clock, Shield, GitBranch, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const FeatureCard = ({ icon: Icon, title, description, delay }) => (
   <div
@@ -31,7 +32,9 @@ const ProblemCard = ({ icon: Icon, title, description, delay }) => (
     </div>
   </div>
 );
+
 export default function Home() {
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
       {/* Hero Section */}
@@ -57,7 +60,10 @@ export default function Home() {
             A voice-first system that transforms clinician-patient interactions into structured data, diagnoses, and actionable insights—streamlining documentation and improving care quality.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in duration-1000 delay-500">
-            <button className="group relative inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3 font-semibold text-primary-foreground overflow-hidden transition-all duration-500 hover:shadow-lg hover:shadow-primary/50 active:scale-95">
+            <button
+              className="group relative inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3 font-semibold text-primary-foreground overflow-hidden transition-all duration-500 hover:shadow-lg hover:shadow-primary/50 active:scale-95"
+              onClick={() => navigate("/dashboard")}
+            >
               <span className="relative z-10 flex items-center gap-2">
                 Get Started
                 <ArrowRight className="h-5 w-5 transition-transform duration-500 group-hover:translate-x-1" />
