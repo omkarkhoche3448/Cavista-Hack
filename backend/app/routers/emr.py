@@ -347,7 +347,7 @@ def get_insights(
     """Get AI-generated document insights for a session."""
     try:
         result = (
-            supabase.from_("pre_session_insights")
+            supabase.table("pre_session_insights")
             .select("*")
             .eq("session_id", session_id)
             .order("created_at")
@@ -355,7 +355,7 @@ def get_insights(
         )
         return result.data or []
     except Exception as e:
-        logger.error(f"Database error in get_insights: {e}")
+        logger.warning(f"Could not fetch insights (Table might be in 'ai' schema): {e}")
         return []
 
 

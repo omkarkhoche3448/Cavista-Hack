@@ -223,9 +223,6 @@ export default function SessionPage() {
     pauseAudioRecording();
   }, [pauseAudioRecording]);
 
-  const requestAiInsight = useCallback(() => {
-    send("REQUEST_AI_INSIGHT", { session_id: sessionId });
-  }, [send, sessionId]);
 
   async function handleEndSession() {
     setIsEnding(true);
@@ -543,15 +540,6 @@ export default function SessionPage() {
                 </div>
                 Assistant Core
               </CardTitle>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={requestAiInsight}
-                className="h-7 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/10 hover:text-primary transition-all rounded-full px-3"
-                disabled={transcriptChunks.length === 0}
-              >
-                Sync Analysis
-              </Button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-3 space-y-4">

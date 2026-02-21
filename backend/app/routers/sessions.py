@@ -21,7 +21,7 @@ from ..models import (
     EndSessionRequest,
     TranscriptChunkIn,
 )
-from ..services import ai_service
+from ..services import ai_service, s3_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -425,15 +425,18 @@ async def end_session(
 
         # 2. Get document insights for context
         try:
+            # Try to fetch from 'pre_session_insights'. 
+            # If you are using the 'ai' schema, you may need to move this table to 'public' 
+            # or configure Supabase to expose the 'ai' schema.
             insights_data = (
-                supabase.from_("pre_session_insights")
+                supabase.table("pre_session_insights")
                 .select("summary, key_findings, medications_found, allergies_found")
                 .eq("session_id", body.session_id)
                 .execute()
             )
             document_insights = insights_data.data if insights_data.data else None
         except Exception as e:
-            logger.error(f"Failed to fetch pre-session insights: {e}")
+            logger.warning(f"Note: Could not fetch pre-session insights (Table might be in 'ai' schema or missing): {e}")
             document_insights = None
 
         # 3. Generate EMR draft
@@ -680,29 +683,48 @@ async def upload_recording(
     session_id: str,
     file: UploadFile = File(...),
     current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
 ):
     """
-    Upload session recording and save locally in 's3' folder in the repo root.
+    Upload session recording to S3 and save URL in the database.
     """
-    # The repo root is one level up from the backend directory
-    # Backend started from /root/cavista/backend
-    repo_root = os.path.abspath(os.path.join(os.getcwd(), ".."))
-    recordings_dir = os.path.join(repo_root, "s3")
-
-    if not os.path.exists(recordings_dir):
-        os.makedirs(recordings_dir)
-
-    # Use original filename extension or default to webm
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else "webm"
-    file_path = os.path.join(recordings_dir, f"{session_id}.{file_ext}")
-
     try:
         content = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(content)
         
-        logger.info(f"Saved recording for session {session_id} to {file_path}")
-        return {"status": "success", "file_path": file_path}
+        # Determine file extension
+        file_ext = "webm"
+        if file.filename and "." in file.filename:
+            file_ext = file.filename.split(".")[-1]
+            
+        s3_key = f"recordings/{session_id}.{file_ext}"
+        
+        # Upload to S3
+        logger.info(f"Uploading recording for session {session_id} to S3...")
+        uploaded_key = s3_service.upload_file(
+            content=content,
+            key=s3_key,
+            content_type=file.content_type or "audio/webm"
+        )
+        
+        if not uploaded_key:
+            raise HTTPException(status_code=500, detail="Failed to upload recording to S3")
+
+        # Construct S3 URL (using virtual-host style)
+        recording_url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{uploaded_key}"
+        
+        # Update database with the recording URL
+        try:
+            db_res = supabase.table("sessions").update({"recording_url": recording_url}).eq("id", session_id).execute()
+            logger.info(f"Recording for session {session_id} saved to S3 and DB: {recording_url}")
+        except Exception as db_err:
+             # Log but don't fail the whole request because the S3 upload succeeded
+             logger.error(f"Failed to update session with recording URL in DB (Check if 'recording_url' column exists): {db_err}")
+        
+        return {
+            "status": "success", 
+            "recording_url": recording_url,
+            "session_id": session_id
+        }
     except Exception as e:
-        logger.error(f"Failed to save recording: {e}")
+        logger.error(f"Failed to process recording upload: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save recording: {str(e)}")
