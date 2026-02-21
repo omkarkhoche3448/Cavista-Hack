@@ -1,20 +1,21 @@
 import { BrowserRouter as Router } from "react-router-dom";
 import { AuthProvider } from "@/features/auth";
 import { WebSocketProvider } from "@/context/WebSocketContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import AppRouter from "./AppRouter.jsx";
-import Navbar from "./components/navbar/Navbar";
 
 function App() {
   return (
     <Router>
       <AuthProvider>
         <WebSocketProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Navbar />
-            <main className="max-w-6xl mx-auto px-6 py-8">
+          <TooltipProvider>
+            <div className="min-h-screen bg-background text-foreground">
               <AppRouter />
-            </main>
-          </div>
+            </div>
+            <Toaster richColors position="top-right" />
+          </TooltipProvider>
         </WebSocketProvider>
       </AuthProvider>
     </Router>

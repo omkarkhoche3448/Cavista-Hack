@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home.jsx";
+import DefaultLayout from "./components/layout/DefaultLayout";
 import {
   LoginPage,
   SignupPage,
@@ -9,38 +10,51 @@ import {
 } from "@/features/auth";
 import RoleRedirect from "./features/auth/RoleRedirect";
 import { DoctorDashboard } from "@/features/doctor-dashboard";
-import { PatientDashboard } from "@/features/patient-dashboard";
+import PatientDashboardLayout from "@/features/patient-dashboard/components/PatientDashboardLayout";
+import MyHealthPage from "@/features/patient-dashboard/components/health/MyHealthPage";
+import MyDocumentsPage from "@/features/patient-dashboard/components/documents/MyDocumentsPage";
 
 export default function AppRouter() {
   return (
     <Routes>
-      <Route path="/home" element={<Home />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
+      {/* Public routes */}
+      <Route path="/home" element={<DefaultLayout><Home /></DefaultLayout>} />
+      <Route path="/login" element={<DefaultLayout><LoginPage /></DefaultLayout>} />
+      <Route path="/signup" element={<DefaultLayout><SignupPage /></DefaultLayout>} />
+      <Route path="/auth/callback" element={<DefaultLayout><AuthCallback /></DefaultLayout>} />
 
+      {/* Doctor dashboard */}
       <Route
         path="/doctor/dashboard"
         element={
-          <ProtectedRoute>
-            <RoleRoute allowedRole="doctor">
-              <DoctorDashboard />
-            </RoleRoute>
-          </ProtectedRoute>
+          <DefaultLayout>
+            <ProtectedRoute>
+              <RoleRoute allowedRole="doctor">
+                <DoctorDashboard />
+              </RoleRoute>
+            </ProtectedRoute>
+          </DefaultLayout>
         }
       />
 
+      {/* Patient dashboard — nested with sidebar */}
       <Route
-        path="/patient/dashboard"
+        path="/patient"
         element={
           <ProtectedRoute>
             <RoleRoute allowedRole="patient">
-              <PatientDashboard />
+              <PatientDashboardLayout />
             </RoleRoute>
           </ProtectedRoute>
         }
-      />
+      >
+        <Route path="dashboard" element={<MyHealthPage />} />
+        <Route path="health" element={<MyHealthPage />} />
+        <Route path="documents" element={<MyDocumentsPage />} />
+        <Route index element={<Navigate to="dashboard" replace />} />
+      </Route>
 
+      {/* Generic dashboard redirect */}
       <Route
         path="/dashboard"
         element={
