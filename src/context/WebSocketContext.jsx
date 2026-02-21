@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/features/auth";
 import wsService from "@/services/websocketService";
+import { supabase } from "@/config/supabase";
 
 const WebSocketContext = createContext(null);
 
@@ -32,6 +33,11 @@ export function WebSocketProvider({ children }) {
 
     const unsub1 = wsService.on("_connected", () => setIsConnected(true));
     const unsub2 = wsService.on("_disconnected", () => setIsConnected(false));
+    const unsubExpired = wsService.on("_token_expired", async () => {
+      // Token expired — refresh session so AuthContext updates and triggers reconnect
+      connectedTokenRef.current = null;
+      await supabase.auth.refreshSession();
+    });
     const unsub3 = wsService.on("NOTIFICATION", (data) => {
       setNotifications((prev) => [{ ...data, id: Date.now(), read: false }, ...prev]);
     });
@@ -52,6 +58,7 @@ export function WebSocketProvider({ children }) {
     return () => {
       unsub1();
       unsub2();
+      unsubExpired();
       unsub3();
       unsub4();
       // Don't disconnect here — keep the WS alive across re-renders.
