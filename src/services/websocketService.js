@@ -48,6 +48,12 @@ class WebSocketService {
         console.log("[WS] Disconnected", event.code);
         this.isConnecting = false;
         this._emit("_disconnected", { code: event.code });
+        if (event.code === 4001) {
+          // Token expired/invalid — stop retrying with stale token, notify caller
+          this.token = null;
+          this._emit("_token_expired", {});
+          return;
+        }
         if (!this.isManualClose && this.token) {
           this._scheduleReconnect();
         }

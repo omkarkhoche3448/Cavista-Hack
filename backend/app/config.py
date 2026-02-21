@@ -6,6 +6,8 @@ dotenv.load_dotenv()
 
 class Settings(BaseSettings):
     GOOGLE_API_KEY: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
     SUPABASE_URL: str
     SUPABASE_KEY: str
     SUPABASE_JWT_SECRET: str

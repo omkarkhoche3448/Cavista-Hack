@@ -24,8 +24,7 @@ class ConnectionManager:
         self.ws_to_user: Dict[WebSocket, str] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str) -> str:
-        """Accept a WebSocket connection and track it."""
-        await websocket.accept()
+        """Track an already-accepted WebSocket connection."""
         connection_id = str(uuid.uuid4())
 
         if user_id not in self.active_connections:

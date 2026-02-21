@@ -34,6 +34,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
     WebSocket entry point. Client connects with ?token=<jwt>.
     After auth, messages are JSON: {"event": "...", "data": {...}}
     """
+    # Accept the WebSocket handshake first so we can send proper close codes
+    await websocket.accept()
+
     # Authenticate via JWT
     try:
         header = jwt.get_unverified_header(token)
@@ -63,7 +66,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             await websocket.close(code=4001, reason="Invalid token")
             return
     except JWTError:
-        await websocket.close(code=4001, reason="Invalid token")
+        await websocket.close(code=4001, reason="Token expired or invalid")
         return
 
     connection_id = await manager.connect(websocket, user_id)
