@@ -1,3 +1,1 @@
-// Configuration
-// Add environment variables, app settings, constants
-// Example: API_URL, APP_NAME, THEME_CONFIG
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
