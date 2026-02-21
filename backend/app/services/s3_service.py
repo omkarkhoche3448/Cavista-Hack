@@ -60,6 +60,7 @@ def upload_file(content: bytes, key: str, content_type: str = "application/octet
     return key
 
 
+
 def generate_presigned_url(key: str, expiry: int = 3600) -> str:
     """
     Generates a temporary presigned URL for secure access to an S3 object.

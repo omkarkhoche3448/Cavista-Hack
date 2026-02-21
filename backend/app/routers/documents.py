@@ -3,9 +3,11 @@ Document Router — Upload, list, share medical documents.
 Uses AWS S3 for file storage and ai_service for lab report analysis.
 """
 
+import base64
 import json
 import uuid
 import logging
+from ..services import ai_service, s3_service
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from supabase import Client
 
@@ -14,7 +16,7 @@ from ..db import get_supabase
 from ..oauth2 import get_current_user, require_role
 from ..ws_manager import manager
 from ..models import DocumentResponse, ShareDocumentsRequest
-from ..services import ai_service, s3_service
+from ..services import s3_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -109,7 +111,8 @@ async def upload_document(
 
     doc = result.data[0]
 
-    # Call external analysis API (non-blocking — don't fail upload if analysis fails)
+    # Call external analysis API once, right after successful upload.
+    # content is already in memory — no S3 re-download needed.
     try:
         patient_name = f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip()
         analysis_data = ai_service.analyze_lab_report(signed_url, current_user["id"], patient_name, document_type)
@@ -119,7 +122,7 @@ async def upload_document(
                 "status": "ready",
             }).eq("id", doc["id"]).execute()
             doc["status"] = "ready"
-            doc["analysis_result"] = analysis_data
+            doc["ocr_extracted_text"] = json.dumps(analysis_data)
             logger.info(f"Analysis complete for doc {doc['id']}")
         else:
             doc["analysis_result"] = None
@@ -127,7 +130,7 @@ async def upload_document(
         logger.error(f"Analysis failed for doc {doc['id']}: {e}")
         doc["analysis_result"] = None
 
-    return doc
+    return _enrich_doc(doc)
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -208,6 +211,34 @@ def get_document(
     return _enrich_doc(doc)
 
 
+@router.delete("/{document_id}", status_code=204)
+def delete_document(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Soft-delete a document (patients can only delete their own)."""
+    result = (
+        supabase.table("medical_documents")
+        .select("id, patient_id")
+        .eq("id", document_id)
+        .is_("deleted_at", "null")
+        .single()
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    if result.data["patient_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    from datetime import datetime, timezone
+    supabase.table("medical_documents").update({
+        "deleted_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", document_id).execute()
+
+
 @router.get("/{document_id}/analysis")
 def get_document_analysis(
     document_id: str,
@@ -228,7 +259,7 @@ def get_document_analysis(
     """
     result = (
         supabase.table("medical_documents")
-        .select("id, patient_id, ocr_extracted_text, status")
+        .select("id, patient_id, document_type, storage_key, ocr_extracted_text, status")
         .eq("id", document_id)
         .is_("deleted_at", "null")
         .single()
@@ -238,6 +269,7 @@ def get_document_analysis(
         raise HTTPException(status_code=404, detail="Document not found.")
 
     doc = result.data
+    # Check access
     if doc["patient_id"] != current_user["id"]:
         if current_user["role"] == "doctor":
             shares = (

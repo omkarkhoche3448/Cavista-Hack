@@ -18,10 +18,9 @@ def get_supabase() -> Client:
     """
     FastAPI dependency that provides the initialized Supabase client singleton.
     
-    Called by:
-        - Virtually all routers (auth.py, sessions.py, documents.py, emr.py) as a Depends() dependency.
-        - Internal handle_ws_event utility in sessions.py.
-        
+    Why: Centralizes client initialization and allows for easy dependency injection in routes.
+    Where: Used via `Depends(get_supabase)` in almost all backend routers.
+    
     Returns:
         supabase.Client: The shared Supabase client instance.
     """
