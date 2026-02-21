@@ -36,7 +36,7 @@ const statusColors = {
     Cancelled: "bg-red-100 text-red-800",
 };
 
-export default function Sessions() {
+export default function AllSessions() {
     const [sessions] = useState(sessionsData);
     const navigate = useNavigate();
 

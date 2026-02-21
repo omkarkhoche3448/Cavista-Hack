@@ -9,9 +9,10 @@ import {
   RoleRoute,
 } from "@/features/auth";
 import RoleRedirect from "./features/auth/RoleRedirect";
-import DoctorCall from "./pages/doctor/DoctorCallPage";
+import DoctorCall from "./pages/doctor/DoctorCallPage.jsx";
 import DoctorDashboard from "./pages/doctor/DoctorDashboard.jsx";
-import DoctorSessions from "./pages/doctor/DoctorSessions.jsx";
+import AllSessions from "./pages/doctor/Sessions.jsx";
+import AllPatients from "./pages/doctor/Patients.jsx";
 import IndividualPatient from "./pages/doctor/IndividualPatient.jsx";
 import PostSessionReview from "./pages/doctor/ReviewSession.jsx";
 import DoctorProfile from "./pages/doctor/DoctorProfilePage.jsx";
@@ -21,9 +22,8 @@ import Home from "./pages/Home.jsx";
 import IndividualSession from "./pages/doctor/IndividualSession";
 import IndividualSessionSummary from "./pages/patient/IndividualSession";
 import PatientCall from "./pages/patient/PatientCallPage.jsx";
-import DoctorPatients from "./pages/doctor/DoctorPatients.jsx";
 import Uploads from "./pages/patient/Uploads";
-
+import PatientAllSessions from "./pages/patient/Sessions.jsx";
 const ProtectedDoctorRoute = ({ children }) => (
   <ProtectedRoute>
     <RoleRoute allowedRole="doctor">{children}</RoleRoute>
@@ -48,7 +48,7 @@ export default function AppRouter() {
 
       {/* Doctor Routes */}
       <Route
-        path="/doctor"
+        path="/doctor/dashboard"
         element={
           <DefaultLayout>
             <ProtectedDoctorRoute>
@@ -72,7 +72,7 @@ export default function AppRouter() {
         element={
           <DefaultLayout>
             <ProtectedDoctorRoute>
-              <DoctorSessions />
+              <AllSessions />
             </ProtectedDoctorRoute>
           </DefaultLayout>
         }
@@ -82,7 +82,7 @@ export default function AppRouter() {
         element={
           <DefaultLayout>
             <ProtectedDoctorRoute>
-              <DoctorPatients />
+              <AllPatients />
             </ProtectedDoctorRoute>
           </DefaultLayout>
         }
@@ -130,7 +130,7 @@ export default function AppRouter() {
       > */}
 
       <Route
-        path="/patient"
+        path="/patient/dashboard"
         element={
           <ProtectedPatientRoute>
             <PatientDashboard />
@@ -149,7 +149,7 @@ export default function AppRouter() {
         path="/patient/sessions"
         element={
           <ProtectedPatientRoute>
-            <PatientSessions />
+            <PatientAllSessions />
           </ProtectedPatientRoute>
         }
       />

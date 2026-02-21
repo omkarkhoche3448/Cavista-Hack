@@ -1,4 +1,4 @@
-export default function Patients() {
+export default function AllPatients() {
     return (
         <div className="max-w-5xl mx-auto p-6">
             <h1 className="text-4xl font-extrabold mb-2 text-gray-900 tracking-tight">John Doe</h1>

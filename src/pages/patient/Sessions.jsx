@@ -1,4 +1,4 @@
-export default function PatientSessions() {
+export default function PatientAllSessions() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Patient Sessions</h1>
