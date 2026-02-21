@@ -86,6 +86,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+    except JWTError as e:
+        # Token expired or invalid — close with 4001 so the frontend knows to refresh
+        logger.error(f"WS JWT error for user {user_id}: {e}")
+        manager.disconnect(websocket)
+        try:
+            await websocket.close(code=4001, reason="Token expired or invalid")
+        except Exception:
+            pass
     except Exception as e:
         logger.error(f"WS error for user {user_id}: {e}")
         manager.disconnect(websocket)
@@ -728,6 +736,111 @@ def list_sessions(
         s["patient_email"] = pat.get("email")
         sessions.append(s)
     return sessions
+
+
+@router.get("/patients")
+def list_patients(
+    current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
+):
+    """
+    Returns a deduplicated list of patients who have had sessions with this doctor.
+
+    Why: Populates the doctor's Patients page with real patient data.
+    Where: Called by the Patients view in the Doctor Dashboard.
+    """
+    doctor_id = current_user["id"]
+
+    result = (
+        supabase.table("sessions")
+        .select("patient_id, status, created_at, patient:users!patient_id(first_name, last_name, email, phone, date_of_birth)")
+        .eq("doctor_id", doctor_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    seen: dict = {}
+    for s in (result.data or []):
+        pid = s["patient_id"]
+        pat = s.pop("patient") or {}
+        if pid not in seen:
+            seen[pid] = {
+                "id": pid,
+                "name": f"{pat.get('first_name', '')} {pat.get('last_name', '')}".strip(),
+                "email": pat.get("email", ""),
+                "phone": pat.get("phone", ""),
+                "session_count": 0,
+                "last_session_at": s["created_at"],
+                "last_session_status": s["status"],
+            }
+        seen[pid]["session_count"] += 1
+
+    return list(seen.values())
+
+
+@router.get("/patients/{patient_id}")
+def get_patient_detail(
+    patient_id: str,
+    current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
+):
+    """
+    Returns full patient details (user info + patient_profile) for a specific patient.
+    Only accessible to doctors who have had at least one session with this patient.
+    """
+    doctor_id = current_user["id"]
+
+    # Verify the doctor has had sessions with this patient
+    access_check = (
+        supabase.table("sessions")
+        .select("id")
+        .eq("doctor_id", doctor_id)
+        .eq("patient_id", patient_id)
+        .limit(1)
+        .execute()
+    )
+    if not access_check.data:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    # Fetch user base info
+    user_result = (
+        supabase.table("users")
+        .select("id, first_name, last_name, email, phone, date_of_birth, gender")
+        .eq("id", patient_id)
+        .single()
+        .execute()
+    )
+    if not user_result.data:
+        raise HTTPException(status_code=404, detail="Patient not found.")
+
+    u = user_result.data
+
+    # Fetch patient profile (optional — may not exist)
+    profile_result = (
+        supabase.table("patient_profiles")
+        .select("*")
+        .eq("user_id", patient_id)
+        .execute()
+    )
+    p = profile_result.data[0] if profile_result.data else {}
+
+    return {
+        "id": u["id"],
+        "name": f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
+        "email": u.get("email", ""),
+        "phone": u.get("phone"),
+        "date_of_birth": u.get("date_of_birth"),
+        "gender": u.get("gender"),
+        "mrn": p.get("mrn"),
+        "blood_type": p.get("blood_type"),
+        "height_cm": p.get("height_cm"),
+        "weight_kg": p.get("weight_kg"),
+        "emergency_contact_name": p.get("emergency_contact_name"),
+        "emergency_contact_phone": p.get("emergency_contact_phone"),
+        "emergency_contact_relation": p.get("emergency_contact_relation"),
+        "insurance_provider": p.get("insurance_provider"),
+        "insurance_policy_number": p.get("insurance_policy_number"),
+    }
 
 
 @router.get("/{session_id}")

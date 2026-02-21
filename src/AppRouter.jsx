@@ -119,9 +119,11 @@ export default function AppRouter() {
       <Route
         path="/doctor/patient/:patientId"
         element={
-          <ProtectedDoctorRoute>
-            <IndividualPatient />
-          </ProtectedDoctorRoute>
+          <DefaultLayout>
+            <ProtectedDoctorRoute>
+              <IndividualPatient />
+            </ProtectedDoctorRoute>
+          </DefaultLayout>
         }
       />
       <Route
