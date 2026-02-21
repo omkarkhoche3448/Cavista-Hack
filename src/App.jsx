@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Link } from "react-router-dom";
+import { BrowserRouter as Router } from "react-router-dom";
 import AppRouter from "./AppRouter.jsx";
 import Navbar from "./components/navbar/Navbar";
 
