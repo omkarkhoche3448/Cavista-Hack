@@ -41,7 +41,7 @@ export default function AppRouter() {
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Navigate to="/home" replace />} />
-      <Route path="/home" element={<DefaultLayout><Home /></DefaultLayout>} />
+      <Route path="/home" element={<Home />} />
       <Route path="/login" element={<DefaultLayout><GuestRoute><LoginPage /></GuestRoute></DefaultLayout>} />
       <Route path="/signup" element={<DefaultLayout><GuestRoute><SignupPage /></GuestRoute></DefaultLayout>} />
       <Route path="/auth/callback" element={<DefaultLayout><AuthCallback /></DefaultLayout>} />

@@ -5,9 +5,8 @@ import { useAuth } from "./AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { HeartPulse, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
+import { Activity, Loader2, ArrowRight, Mic, FileCheck } from "lucide-react";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -44,67 +43,76 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Orbs */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 opacity-20">
-        <div className="h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
-      </div>
-      <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 opacity-10">
-        <div className="h-96 w-96 rounded-full bg-secondary/20 blur-3xl" />
+    <div className="min-h-[80vh] flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background decoration — matches landing page */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute top-20 left-1/4 w-72 h-72 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute bottom-10 right-1/4 w-96 h-96 rounded-full bg-accent/10 blur-3xl" />
       </div>
 
-      <div className="w-full max-w-[1000px] grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10 animate-in fade-in duration-500">
-        {/* Left Side: Branding/Visual */}
-        <div className="hidden lg:flex flex-col justify-center p-8 space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider w-fit">
-            <ShieldCheck className="w-3 h-3" /> Secure Health Access
-          </div>
-          <h1 className="text-5xl font-black tracking-tight text-foreground leading-[1.1]">
-            Welcome back to <span className="text-primary italic">sewa मित्र</span>
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
+        {/* Left Side: Branding */}
+        <div className="hidden lg:flex flex-col justify-center space-y-6">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold w-fit">
+            <Activity className="w-4 h-4" />
+            Welcome Back
+          </span>
+
+          <h1 className="text-4xl md:text-5xl font-bold font-heading leading-tight">
+            Sign in to <span className="text-gradient-primary">SEVAमित्र</span>
           </h1>
-          <p className="text-lg text-muted-foreground font-medium leading-relaxed max-w-md">
-            Your intelligent healthcare companion. Sign in to access your dashboard,
-            manage records, and connect with live support.
+
+          <p className="text-lg text-muted-foreground leading-relaxed max-w-md">
+            Access your clinical dashboard, manage patient records, and continue
+            real-time consultations with AI-powered documentation.
           </p>
 
-          <div className="grid grid-cols-2 gap-4 pt-4">
-            <div className="p-4 rounded-2xl bg-card border border-border/50 shadow-sm">
-              <p className="text-sm font-bold text-primary mb-1">AI-Powered</p>
-              <p className="text-xs text-muted-foreground">Smart documentation and EMR generation.</p>
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="rounded-xl border bg-card p-5 shadow-card">
+              <Mic className="w-5 h-5 text-primary mb-3" />
+              <p className="text-sm font-semibold font-heading mb-1">
+                Voice-First
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Speak naturally, AI documents everything.
+              </p>
             </div>
-            <div className="p-4 rounded-2xl bg-card border border-border/50 shadow-sm">
-              <p className="text-sm font-bold text-primary mb-1">Live Support</p>
-              <p className="text-xs text-muted-foreground">Real-time consultation and monitoring.</p>
+            <div className="rounded-xl border bg-card p-5 shadow-card">
+              <FileCheck className="w-5 h-5 text-accent mb-3" />
+              <p className="text-sm font-semibold font-heading mb-1">
+                Instant EMR
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Auto-generated records with ICD-10 codes.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Form */}
-        <Card className="rounded-3xl border-border/40 shadow-2xl shadow-primary/5 backdrop-blur-sm bg-card/80 overflow-hidden relative group">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary opacity-50" />
+        {/* Right Side: Form Card */}
+        <div className="rounded-2xl border bg-card shadow-card-lg p-8 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary" />
 
-          <CardHeader className="space-y-4 pt-8 text-center lg:text-left">
-            <div className="flex justify-center lg:justify-start">
-              <div className="p-3 rounded-2xl bg-primary/10 text-primary shadow-inner">
-                <HeartPulse className="w-8 h-8" />
+          <div className="space-y-6">
+            <div className="text-center lg:text-left flex flex-row items-center justify-center lg:justify-start gap-4">
+              <div className="inline-flex p-3 rounded-xl bg-primary/10 text-primary mb-4">
+                <Activity className="w-7 h-7" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold font-heading">Sign In</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Enter your credentials to continue
+                </p>
               </div>
             </div>
-            <div>
-              <CardTitle className="text-3xl font-black tracking-tight">Sign In</CardTitle>
-              <CardDescription className="text-base font-medium mt-1">
-                Enter your credentials to continue your journey
-              </CardDescription>
-            </div>
-          </CardHeader>
 
-          <CardContent className="pb-8 space-y-6">
             <Button
               variant="outline"
-              className="w-full rounded-2xl h-12 border-border/60 hover:border-primary hover:bg-primary/5 transition-all duration-300 font-bold"
+              className="w-full rounded-xl h-11 font-semibold"
               onClick={handleGoogle}
               type="button"
             >
-              <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                   fill="#4285F4"
@@ -126,20 +134,22 @@ export default function LoginPage() {
             </Button>
 
             <div className="relative">
-              <Separator className="bg-border/60" />
-              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                or use email
+              <Separator />
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                or
               </span>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="font-bold text-xs uppercase tracking-widest text-muted-foreground ml-1">Email Address</Label>
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@care.com"
-                  className="rounded-xl h-11 bg-background/50 border-border/60 focus:border-primary focus:ring-primary/20"
+                  className="rounded-lg h-11"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -147,15 +157,22 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between ml-1">
-                  <Label htmlFor="password" className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Password</Label>
-                  <Link to="#" className="text-[10px] font-bold text-primary uppercase tracking-wider hover:underline">Forgot?</Link>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </Label>
+                  <Link
+                    to="#"
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Forgot?
+                  </Link>
                 </div>
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
-                  className="rounded-xl h-11 bg-background/50 border-border/60 focus:border-primary focus:ring-primary/20"
+                  className="rounded-lg h-11"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -163,30 +180,38 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-bold text-center animate-shake">
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium text-center">
                   {error}
                 </div>
               )}
 
-              <Button type="submit" className="w-full rounded-2xl h-12 shadow-lg shadow-primary/25 font-bold group" disabled={loading}>
+              <Button
+                variant="hero"
+                type="submit"
+                className="w-full rounded-xl h-11 gap-2"
+                disabled={loading}
+              >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <span className="flex items-center gap-2">
-                    Sign Into Account <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </span>
+                  <>
+                    Sign In <ArrowRight className="w-4 h-4" />
+                  </>
                 )}
               </Button>
             </form>
 
-            <p className="text-sm font-medium text-center text-muted-foreground pt-2">
+            <p className="text-sm text-center text-muted-foreground">
               Don&apos;t have an account?{" "}
-              <Link to="/signup" className="text-primary font-bold hover:underline">
-                Create one now
+              <Link
+                to="/signup"
+                className="text-primary font-semibold hover:underline"
+              >
+                Create one
               </Link>
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

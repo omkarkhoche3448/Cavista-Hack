@@ -26,18 +26,19 @@ def _call(endpoint: str, payload: dict):
     """
     try:
         url = f"{BASE_URL}{endpoint}"
-        logger.info(f"External AI POST: {url}")
+        print(f"[AI_SERVICE] POST {url}")
         resp = requests.post(url, json=payload, timeout=90)
+        print(f"[AI_SERVICE] Response {resp.status_code}")
         if resp.status_code == 200:
             return resp.json()
         elif resp.status_code == 404:
-            logger.warning(f"External AI 404: {url} — skipping.")
+            print(f"[AI_SERVICE] 404: {url} — skipping.")
             return None
         else:
-            logger.error(f"External AI Error ({resp.status_code}): {resp.text}")
+            print(f"[AI_SERVICE] Error ({resp.status_code}): {resp.text}")
             return None
     except Exception as e:
-        logger.error(f"External AI connection failed: {e}")
+        print(f"[AI_SERVICE] Connection failed: {e}")
         return None
 
 
