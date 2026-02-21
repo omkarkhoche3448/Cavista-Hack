@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/patient/dashboard" },
@@ -26,38 +27,42 @@ export default function PatientSidebar() {
     (profile?.first_name?.[0] || "") + (profile?.last_name?.[0] || "");
 
   return (
-    <Sidebar>
-      <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+    <Sidebar className="border-r border-sidebar-border bg-sidebar/50 backdrop-blur-xl">
+      <SidebarHeader className="p-6 border-b border-sidebar-border/60 mb-2">
+        <div className="flex items-center gap-4 transition-all duration-300">
+          <Avatar className="h-10 w-10 ring-2 ring-primary/10 shadow-sm">
+            <AvatarFallback className="bg-primary/10 text-primary text-sm font-black uppercase tracking-tighter">
               {initials || "P"}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold leading-tight">
-              {profile?.first_name || "Patient"} {profile?.last_name || ""}
+            <span className="text-sm font-black tracking-tight leading-tight">
+              {profile?.first_name || "Patient"}
             </span>
-            <span className="text-xs text-sidebar-foreground/60">Patient</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] italic">Patient Portal</span>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-3">
         <SidebarGroup>
-          <SidebarGroupLabel>
-            <LayoutDashboard className="w-4 h-4 mr-2" />
-            Dashboard
+          <SidebarGroupLabel className="px-3 mb-4 text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/50">
+            Main Menu
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-2">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild className="h-11 rounded-xl transition-all duration-300">
                     <NavLink
                       to={item.path}
                       className={({ isActive }) =>
-                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""
+                        cn(
+                          "flex items-center gap-3 px-4 w-full h-full font-bold text-sm transition-all duration-300",
+                          isActive
+                            ? "bg-primary/10 text-primary border-l-2 border-primary"
+                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        )
                       }
                     >
                       <item.icon className="w-4 h-4" />
@@ -70,6 +75,13 @@ export default function PatientSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <div className="mt-auto p-4">
+        <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-primary italic">Live Support</p>
+          <p className="text-xs text-muted-foreground font-medium italic leading-relaxed">Need help? Our AI clinical assistants are standing by.</p>
+        </div>
+      </div>
     </Sidebar>
   );
 }

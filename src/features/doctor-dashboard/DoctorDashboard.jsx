@@ -198,53 +198,57 @@ export default function DoctorDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="animate-in fade-in-down duration-700">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold">
-              Welcome, Dr. {profile?.first_name}
+      {/* Premium Welcome Header */}
+      <div className="relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-secondary/5 border border-primary/20 animate-in fade-in duration-500">
+        <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 -mr-8 -mt-8">
+          <LayoutDashboard className="w-48 h-48 text-primary" />
+        </div>
+
+        <div className="relative flex flex-col xl:flex-row xl:items-center justify-between gap-8">
+          <div className="space-y-3">
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+              Welcome, Dr. <span className="text-primary italic">{profile?.first_name}</span>
             </h1>
-            <p className="text-muted-foreground mt-1 flex items-center gap-2">
-              Here&apos;s your dashboard overview
+            <div className="flex flex-wrap items-center gap-4">
+              <p className="text-muted-foreground font-medium">Your clinical command center is ready</p>
+              <div className="h-4 w-[1px] bg-border hidden sm:block" />
               {isConnected ? (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <Wifi className="w-3 h-3" /> Live
-                </span>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
+                  <Wifi className="w-3 h-3" /> Live Control
+                </Badge>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 gap-1 px-3 py-1">
                   <WifiOff className="w-3 h-3" /> Offline
-                </span>
+                </Badge>
               )}
-            </p>
+            </div>
           </div>
 
-          {/* Navigation Buttons */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="default"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300"
+              className="rounded-full px-6 bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 font-bold"
             >
               <Activity className="w-4 h-4 mr-2" />
               Dashboard
             </Button>
             <Button
               variant="outline"
-              className="hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+              className="rounded-full px-6 border-primary/20 hover:bg-primary hover:text-white transition-all duration-300 font-bold"
             >
               <CalendarDays className="w-4 h-4 mr-2" />
               Sessions
             </Button>
             <Button
               variant="outline"
-              className="hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+              className="rounded-full px-6 border-primary/20 hover:bg-primary hover:text-white transition-all duration-300 font-bold"
             >
               <Users className="w-4 h-4 mr-2" />
               Patients
             </Button>
             <Button
               variant="outline"
-              className="hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+              className="rounded-full px-6 border-primary/20 hover:bg-primary hover:text-white transition-all duration-300 font-bold"
             >
               <FileBarChart className="w-4 h-4 mr-2" />
               Reports
@@ -254,9 +258,9 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Start New Session CTA */}
-      <div className="animate-in fade-in-up duration-700 delay-100">
+      <div className="animate-in fade-in duration-500 delay-100">
         <div className="relative overflow-hidden">
-          <Card className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 border-2 border-dashed border-primary/40 hover:border-primary hover:shadow-2xl hover:shadow-primary/25 transition-all duration-700 group transform hover:scale-[1.01]">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 border-2 border-dashed border-primary/40 hover:border-primary hover:shadow-xl transition-all duration-300 group">
             <div className="absolute inset-0 opacity-5 pointer-events-none">
               <div className="w-full h-full" style={{
                 backgroundImage: `radial-gradient(circle at 25px 25px, currentColor 2px, transparent 0)`,
@@ -266,11 +270,10 @@ export default function DoctorDashboard() {
 
             <CardContent className="relative p-10 text-center">
               <div className="relative mx-auto mb-8 w-24 h-24">
-                <div className="absolute inset-0 bg-primary/20 rounded-full animate-spin opacity-30" style={{ animationDuration: '4s' }} />
-                <div className="absolute inset-3 bg-background rounded-full shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                  <Mic className="w-10 h-10 text-primary group-hover:animate-pulse" />
+                <div className="absolute inset-0 bg-primary/20 rounded-full opacity-30" />
+                <div className="absolute inset-3 bg-background rounded-full shadow-inner flex items-center justify-center transition-transform duration-500">
+                  <Mic className="w-10 h-10 text-primary" />
                 </div>
-                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-primary/40 rounded-full animate-ping" />
               </div>
 
               <div className="space-y-4 mb-10">
@@ -283,7 +286,7 @@ export default function DoctorDashboard() {
               <Button
                 onClick={() => setShowModal(true)}
                 size="lg"
-                className="group/btn relative inline-flex items-center gap-4 px-16 py-8 text-2xl font-black rounded-full shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all duration-500 active:scale-95 transform hover:-translate-y-2"
+                className="group/btn relative inline-flex items-center gap-4 px-16 py-8 text-2xl font-black rounded-full shadow-xl shadow-primary/20 transition-all duration-300 active:scale-95"
               >
                 <div className="absolute inset-0 bg-white/10 -skew-x-12 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-1000" />
                 <span className="relative z-10 flex items-center gap-4">

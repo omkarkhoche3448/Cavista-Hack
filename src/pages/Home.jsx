@@ -3,32 +3,32 @@ import { useNavigate } from "react-router-dom";
 
 const FeatureCard = ({ icon: Icon, title, description, delay }) => (
   <div
-    className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 transition-all duration-500 hover:shadow-xl hover:border-primary hover:-translate-y-1 animate-in fade-in-up"
+    className="group relative overflow-hidden rounded-3xl border border-border/40 bg-card/50 backdrop-blur-sm p-8 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1 animate-in fade-in"
     style={{ animationDelay: `${delay}ms`, animationDuration: '600ms' }}
   >
-    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
     <div className="relative">
-      <div className="mb-4 inline-block rounded-lg bg-primary/10 p-3 text-primary group-hover:scale-125 group-hover:bg-primary/20 transition-all duration-500">
+      <div className="mb-6 inline-block rounded-2xl bg-primary/10 p-4 text-primary group-hover:bg-primary/20 transition-all duration-300 shadow-inner">
         <Icon className="h-6 w-6" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground group-hover:text-primary transition-colors duration-300">{title}</h3>
-      <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/80 transition-colors duration-300">{description}</p>
+      <h3 className="mb-3 text-xl font-black tracking-tight text-foreground group-hover:text-primary transition-colors duration-300">{title}</h3>
+      <p className="text-sm text-muted-foreground font-medium leading-relaxed group-hover:text-muted-foreground/80 transition-colors duration-300">{description}</p>
     </div>
   </div>
 );
 
 const ProblemCard = ({ icon: Icon, title, description, delay }) => (
   <div
-    className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 transition-all duration-500 hover:shadow-xl hover:border-primary hover:-translate-y-1 animate-in fade-in-up"
+    className="group relative overflow-hidden rounded-3xl border border-border/40 bg-card/40 backdrop-blur-sm p-8 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1 animate-in fade-in"
     style={{ animationDelay: `${delay}ms`, animationDuration: '600ms' }}
   >
-    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
     <div className="relative">
-      <div className="mb-4 inline-block rounded-lg bg-primary/10 p-3 text-primary group-hover:scale-125 group-hover:bg-primary/20 transition-all duration-500">
+      <div className="mb-6 inline-block rounded-2xl bg-primary/10 p-4 text-primary group-hover:bg-primary/20 transition-all duration-300 shadow-inner">
         <Icon className="h-6 w-6" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground group-hover:text-primary transition-colors duration-300">{title}</h3>
-      <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/80 transition-colors duration-300">{description}</p>
+      <h3 className="mb-3 text-xl font-black tracking-tight text-foreground group-hover:text-primary transition-colors duration-300">{title}</h3>
+      <p className="text-sm text-muted-foreground font-medium leading-relaxed group-hover:text-muted-foreground/80 transition-colors duration-300">{description}</p>
     </div>
   </div>
 );
@@ -40,16 +40,16 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative py-24 px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 opacity-20 animate-pulse duration-5000">
+          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 opacity-10">
             <div className="h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
           </div>
-          <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 opacity-15 animate-pulse duration-7000">
+          <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 opacity-10">
             <div className="h-96 w-96 rounded-full bg-secondary/20 blur-3xl" />
           </div>
         </div>
 
         <div className="mx-auto max-w-4xl text-center">
-          <h1 className="mb-6 text-6xl font-bold tracking-tight text-primary animate-in fade-in slide-in-from-top-6 duration-700 fill-mode-both">
+          <h1 className="mb-6 text-6xl font-bold tracking-tight text-primary animate-in fade-in duration-500 scale-95 fill-mode-both">
             <span className="animate-in fade-in duration-1000 delay-100">
               Smart EMR &
             </span>
@@ -177,7 +177,7 @@ export default function Home() {
                 style={{ animationDelay: `${idx * 50}ms`, animationDuration: '600ms' }}
               >
                 <div className="mt-1 h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center group-hover:bg-primary/40 transition-all duration-500 flex-shrink-0">
-                  <div className="h-2 w-2 rounded-full bg-primary group-hover:scale-150 transition-transform duration-500" />
+                  <div className="h-2 w-2 rounded-full bg-primary transition-transform duration-300" />
                 </div>
                 <p className="text-sm text-foreground group-hover:text-primary transition-colors duration-300">{useCase}</p>
               </div>

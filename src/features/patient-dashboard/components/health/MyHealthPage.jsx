@@ -11,16 +11,22 @@ export default function MyHealthPage() {
   const latestSummary = summaries[0];
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Activity className="w-6 h-6 text-primary" />
-          My Health
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Welcome back, {profile?.first_name || "Patient"}. Here&apos;s your health overview.
-        </p>
+    <div className="space-y-8 max-w-5xl mx-auto">
+      {/* Premium Page Header */}
+      <div className="relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-secondary/5 border border-primary/20 animate-in fade-in duration-500">
+        <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 -mr-8 -mt-8">
+          <Activity className="w-48 h-48 text-primary" />
+        </div>
+
+        <div className="relative">
+          <h1 className="text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+            <Activity className="w-10 h-10 text-primary" />
+            My Health
+          </h1>
+          <p className="text-muted-foreground font-medium mt-2 max-w-xl">
+            Track your vitals, review AI-powered health summaries, and stay informed about your well-being.
+          </p>
+        </div>
       </div>
 
       {/* Vitals */}

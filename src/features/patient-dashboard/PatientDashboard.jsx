@@ -174,7 +174,7 @@ export default function PatientDashboard() {
   return (
     <div className="space-y-8">
       {/* Premium Welcome Header */}
-      <div className="relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-secondary/5 border border-primary/20 animate-in fade-in zoom-in duration-700">
+      <div className="relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-secondary/5 border border-primary/20 animate-in fade-in duration-500">
         <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 -mr-8 -mt-8">
           <ShieldCheck className="w-48 h-48 text-primary" />
         </div>
@@ -188,7 +188,7 @@ export default function PatientDashboard() {
               <p className="text-muted-foreground font-medium">Your personalized health dashboard</p>
               <div className="h-4 w-[1px] bg-border hidden sm:block" />
               {isConnected ? (
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 animate-pulse">
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1">
                   <Activity className="w-3 h-3" /> Live Support
                 </Badge>
               ) : (
@@ -255,7 +255,7 @@ export default function PatientDashboard() {
             <Card className="hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Medical Records</CardTitle>
-                <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary transition-transform">
                   <FileText className="w-4 h-4" />
                 </div>
               </CardHeader>
@@ -268,7 +268,7 @@ export default function PatientDashboard() {
             <Card className="hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Active Sessions</CardTitle>
-                <div className="p-2 rounded-lg bg-green-500/10 text-green-600 group-hover:scale-110 transition-transform">
+                <div className="p-2 rounded-lg bg-green-500/10 text-green-600 transition-transform">
                   <Activity className="w-4 h-4" />
                 </div>
               </CardHeader>
@@ -281,7 +281,7 @@ export default function PatientDashboard() {
             <Card className="hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-semibold text-muted-foreground">Visit Summaries</CardTitle>
-                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 group-hover:scale-110 transition-transform">
+                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 transition-transform">
                   <ClipboardList className="w-4 h-4" />
                 </div>
               </CardHeader>
