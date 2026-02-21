@@ -1,9 +1,19 @@
 import { motion } from "framer-motion";
-import { Activity } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Activity, LogOut } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/features/auth";
+import { signOut } from "@/services/authService";
 
 const LandingNavbar = () => {
+  const { isAuthenticated, profile, loading } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    await signOut();
+    navigate("/home", { replace: true });
+  }
+
   return (
     <motion.nav
       initial={{ opacity: 0, y: -20 }}
@@ -29,15 +39,48 @@ const LandingNavbar = () => {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
-            Sign In
-          </Link>
-          <Link
-            to="/signup"
-            className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-          >
-            Get Started
-          </Link>
+          {!loading && (
+            <>
+              {isAuthenticated ? (
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex flex-col items-end">
+                    <span className="text-sm font-bold text-foreground">
+                      {profile?.first_name} {profile?.last_name}
+                    </span>
+                    {profile?.role && (
+                      <span className="text-[10px] font-semibold text-primary uppercase tracking-wider">
+                        {profile.role}
+                      </span>
+                    )}
+                  </div>
+                  <Link
+                    to="/dashboard"
+                    className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="inline-flex items-center justify-center w-9 h-9 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    Get Started
+                  </Link>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
     </motion.nav>

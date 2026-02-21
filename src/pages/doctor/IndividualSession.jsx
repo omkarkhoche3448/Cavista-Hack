@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Mic,
   MicOff,
@@ -19,7 +18,7 @@ import {
   Stethoscope,
   Activity,
 } from "lucide-react";
-import { getSession, endSession, transcribeAudio } from "@/services/sessionService";
+import { getSession, startSession, endSession, transcribeAudio } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
@@ -28,11 +27,10 @@ export default function IndividualSession() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { session: authSession } = useAuth();
-  const { subscribe, send } = useWebSocket();
+  const { subscribe } = useWebSocket();
   const token = authSession?.access_token;
 
   const [sessionData, setSessionData] = useState(null);
-  const [transcriptChunks, setTranscriptChunks] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [insights, setInsights] = useState([]);
   const [aiInsight, setAiInsight] = useState(null);
@@ -40,12 +38,6 @@ export default function IndividualSession() {
   const [isEnding, setIsEnding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [duration, setDuration] = useState(0);
-
-  const recognitionRef = useRef(null);
-  const isRecordingRef = useRef(false);
-  const chunkIndexRef = useRef(0);
-  const sessionStartTimeRef = useRef(Date.now());
-  const transcriptEndRef = useRef(null);
 
   const {
     startRecording: startAudioRecording,
@@ -66,9 +58,6 @@ export default function IndividualSession() {
         setSessionData(sess);
         setDocuments(docs);
         setInsights(ins);
-        sessionStartTimeRef.current = sess.started_at
-          ? new Date(sess.started_at).getTime()
-          : Date.now();
       } catch (err) {
         console.error("Failed to load session:", err);
       } finally {
@@ -99,17 +88,7 @@ export default function IndividualSession() {
 
   // Listen for real-time events
   useEffect(() => {
-    const unsub1 = subscribe("TRANSCRIPT_CHUNK", (data) => {
-      if (data.session_id === sessionId) {
-        setTranscriptChunks((prev) => {
-          const exists = prev.find((c) => c.chunk_index === data.chunk_index);
-          if (exists) return prev;
-          return [...prev, data];
-        });
-      }
-    });
-
-    const unsub2 = subscribe("FILE_SHARED", (data) => {
+    const unsub1 = subscribe("FILE_SHARED", (data) => {
       if (data.session_id === sessionId) {
         setDocuments((prev) => [
           ...prev,
@@ -120,7 +99,7 @@ export default function IndividualSession() {
       }
     });
 
-    const unsub3 = subscribe("AI_INSIGHT_READY", (data) => {
+    const unsub2 = subscribe("AI_INSIGHT_READY", (data) => {
       if (data.session_id === sessionId) {
         if (data.insight) {
           setAiInsight(data.insight);
@@ -131,120 +110,55 @@ export default function IndividualSession() {
       }
     });
 
-    const unsub4 = subscribe("EMR_DRAFT_READY", (data) => {
+    const unsub3 = subscribe("EMR_DRAFT_READY", (data) => {
       if (data.session_id === sessionId) {
         navigate(`/doctor/review/${sessionId}`);
       }
     });
 
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, [subscribe, sessionId, navigate]);
 
-  // Auto-scroll transcript
-  useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [transcriptChunks]);
-
-  // Speech Recognition
-  const startRecording = useCallback(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech recognition not supported in this browser. Use Chrome.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (event) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const text = result[0].transcript;
-        const isFinal = result.isFinal;
-        const now = Date.now();
-
-        if (isFinal && text.trim()) {
-          const chunkIndex = chunkIndexRef.current++;
-          send("TRANSCRIPT_CHUNK", {
-            session_id: sessionId,
-            chunk_index: chunkIndex,
-            text: text.trim(),
-            speaker_role: "doctor",
-            start_time_ms: now - sessionStartTimeRef.current - 2000,
-            end_time_ms: now - sessionStartTimeRef.current,
-            confidence: result[0].confidence,
-            is_final: true,
-          });
-        }
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      if (event.error === "not-allowed") {
+  // Start mic audio recording only
+  const startRecording = useCallback(async () => {
+    try {
+      await startSession(token, sessionId);
+      setSessionData(prev => ({ ...prev, status: "active" }));
+      await startAudioRecording();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      if (err.name === "NotAllowedError") {
         alert("Microphone access denied. Please allow microphone access.");
-        isRecordingRef.current = false;
-        setIsRecording(false);
       }
-    };
-
-    recognition.onend = () => {
-      // Auto-restart only if we're still supposed to be recording
-      if (isRecordingRef.current && recognitionRef.current) {
-        try {
-          recognition.start();
-        } catch (err) {
-          // Silently ignore restart errors
-          console.debug("Speech recognition restart error:", err);
-        }
-      }
-    };
-
-    isRecordingRef.current = true;
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsRecording(true);
-
-    // Start audio recorder
-    startAudioRecording().catch(err => {
-      console.error("Failed to start audio recording:", err);
-    });
-  }, [send, sessionId, startAudioRecording]);
-
-  const stopRecording = useCallback(() => {
-    isRecordingRef.current = false;
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
     }
-    setIsRecording(false);
+  }, [token, sessionId, startAudioRecording]);
 
-    // Pause audio recorder
+  // Pause mic audio recording
+  const stopRecording = useCallback(() => {
     pauseAudioRecording();
+    setIsRecording(false);
   }, [pauseAudioRecording]);
 
 
   async function handleEndSession() {
     setIsEnding(true);
-    stopRecording();
+    setIsRecording(false);
 
     try {
-      // Stop and upload audio recording to local 's3' folder via backend
+      // Stop recording and upload audio blob to S3 via backend
       const audioResult = await stopAudioRecording();
       if (audioResult?.blob) {
         try {
           await transcribeAudio(token, sessionId, audioResult.blob);
-          console.log("Recording saved to s3 folder successfully");
+          console.log("Audio uploaded to S3 successfully");
         } catch (uploadErr) {
-          console.error("Failed to upload recording to s3:", uploadErr);
+          console.error("Failed to upload audio to S3:", uploadErr);
         }
       }
 
       await endSession(token, { sessionId, sessionNotes: "" });
-      // Will navigate to review page when EMR_DRAFT_READY arrives
+      // Navigates to review page when EMR_DRAFT_READY WebSocket event arrives
     } catch (err) {
       console.error("Failed to end session:", err);
       setIsEnding(false);
@@ -398,14 +312,14 @@ export default function IndividualSession() {
       {/* Center — Transcript */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Session Header */}
-        <div className="flex items-center justify-between mb-6 bg-card p-4 rounded-xl border border-border shadow-sm">
+        <div className="flex items-center justify-between mb-6 bg-card p-4 rounded-xl border shadow-card">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
               <User className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold tracking-tight">
+                <h2 className="text-xl font-bold font-heading">
                   {sessionData.patient_name}
                 </h2>
                 <Badge variant="success" className="animate-pulse">Active</Badge>
@@ -424,16 +338,17 @@ export default function IndividualSession() {
             </div>
 
             <div className="flex items-center gap-2">
-              {!isRecording ? (
-                <Button onClick={startRecording} className="gap-2 rounded-full shadow-lg shadow-primary/20 bg-primary hover:scale-105 transition-transform">
+              {sessionData.status === "accepted" && !isRecording && (
+                <Button onClick={startRecording} variant="hero" className="gap-2 rounded-xl">
                   <Mic className="w-4 h-4" />
                   Start Recording
                 </Button>
-              ) : (
+              )}
+              {isRecording && (
                 <Button
                   onClick={stopRecording}
                   variant="outline"
-                  className="gap-2 rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all"
+                  className="gap-2 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5 transition-all"
                 >
                   <MicOff className="w-4 h-4" />
                   Pause
@@ -443,7 +358,7 @@ export default function IndividualSession() {
                 onClick={handleEndSession}
                 variant="destructive"
                 disabled={isEnding}
-                className="gap-2 rounded-full shadow-lg shadow-destructive/20 hover:scale-105 transition-transform"
+                className="gap-2 rounded-xl"
               >
                 {isEnding ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -458,9 +373,9 @@ export default function IndividualSession() {
 
         {/* Recording Indicator */}
         {isRecording && (
-          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-xl">
+            <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+            <span className="text-sm text-destructive font-medium">
               Recording — speak clearly into your microphone
             </span>
           </div>
@@ -507,7 +422,7 @@ export default function IndividualSession() {
                 </div>
 
                 <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-black tracking-tight text-foreground">Listening...</h3>
+                  <h3 className="text-2xl font-bold font-heading text-foreground">Listening...</h3>
                   <p className="text-muted-foreground max-w-sm mx-auto font-medium leading-relaxed">
                     SEVAमित्र is capturing and processing clinical audio in real-time. Full EMR draft will be available upon completion.
                   </p>
@@ -519,14 +434,13 @@ export default function IndividualSession() {
                   <Mic className="w-10 h-10 opacity-20" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-muted-foreground">Ready for Consultation</h3>
+                  <h3 className="text-xl font-bold font-heading text-muted-foreground">Ready for Consultation</h3>
                   <p className="text-sm text-muted-foreground/60 max-w-[240px]">
                     Click the "Start Recording" button to begin the clinical session.
                   </p>
                 </div>
               </div>
             )}
-            <div ref={transcriptEndRef} />
           </CardContent>
         </Card>
       </div>
@@ -592,7 +506,7 @@ export default function IndividualSession() {
                       {aiInsight.potential_concerns.map((c, i) => (
                         <div key={i} className="flex items-start gap-2 p-2.5 rounded-xl bg-destructive/5 border border-destructive/10">
                           <AlertTriangle className="w-3 h-3 text-destructive mt-0.5 flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-extrabold text-destructive flex-1">{c}</span>
+                          <span className="text-[11px] leading-tight font-bold text-destructive flex-1">{c}</span>
                         </div>
                       ))}
                     </div>
@@ -607,7 +521,7 @@ export default function IndividualSession() {
                         <Badge
                           key={i}
                           variant="secondary"
-                          className="bg-muted border border-border text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md hover:bg-primary hover:text-white transition-colors cursor-default"
+                          className="bg-muted border border-border text-[9px] font-bold uppercase tracking-tight px-2 py-0.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors cursor-default"
                         >
                           {d}
                         </Badge>

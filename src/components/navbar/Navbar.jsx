@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Activity, LogOut } from "lucide-react";
-import { ThemeToggle } from "../theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth";
 import { signOut } from "@/services/authService";
@@ -27,8 +26,6 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
-
           {!loading && (
             <>
               {isAuthenticated ? (

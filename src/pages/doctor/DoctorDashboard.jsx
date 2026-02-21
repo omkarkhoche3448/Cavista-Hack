@@ -26,7 +26,6 @@ import {
   AlertTriangle,
   Mail,
   X,
-  BarChart3,
   StopCircle
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,16 +56,16 @@ const SessionCard = ({ session, onStart, isStarting }) => {
   const isActive = session.status === "active";
 
   return (
-    <Card className="group transition-all duration-300 hover:shadow-lg hover:border-primary hover:-translate-y-1 border-gray-200/50 dark:border-gray-800/50 overflow-hidden">
-      <CardContent className="p-6">
+    <Card className="group transition-all duration-300 hover:shadow-card-lg hover:border-primary/50 hover:-translate-y-0.5 overflow-hidden shadow-card">
+      <CardContent className="p-5">
         {/* Header with status */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1">
-            <div className="p-3 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors duration-300">
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-300">
               <User className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-foreground truncate">{session.patient_name}</p>
+              <p className="font-semibold font-heading text-foreground truncate">{session.patient_name}</p>
               <p className="text-sm text-muted-foreground truncate">{session.patient_email}</p>
             </div>
           </div>
@@ -77,11 +76,11 @@ const SessionCard = ({ session, onStart, isStarting }) => {
               </Badge>
             )}
             <Badge className={`whitespace-nowrap ${
-              session.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400' :
-              session.status === 'accepted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400' :
-              session.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' :
-              session.status === 'completed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-400' :
-              'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-400'
+              session.status === 'active' ? 'bg-primary/10 text-primary' :
+              session.status === 'accepted' ? 'bg-accent/10 text-accent-foreground' :
+              session.status === 'pending' ? 'bg-secondary text-secondary-foreground' :
+              session.status === 'completed' ? 'bg-muted text-muted-foreground' :
+              'bg-muted text-muted-foreground'
             }`}>
               {STATUS_BADGE[session.status]?.label ?? session.status}
             </Badge>
@@ -90,22 +89,23 @@ const SessionCard = ({ session, onStart, isStarting }) => {
 
         {/* Chief Complaint */}
         {session.chief_complaint && (
-          <div className="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+          <div className="mb-4 p-3 rounded-lg bg-muted">
             <p className="text-sm text-muted-foreground line-clamp-2">{session.chief_complaint}</p>
           </div>
         )}
 
         {/* Footer with time and action */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200/50 dark:border-gray-800/50">
+        <div className="flex items-center justify-between pt-4 border-t border-border">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Clock className="w-4 h-4" />
+            <Clock className="w-3.5 h-3.5" />
             <span>{new Date(session.created_at).toLocaleDateString()} {new Date(session.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
           </div>
 
           {(isAccepted || isActive) && (
             <Button
               size="sm"
-              className="gap-2 font-semibold"
+              variant="hero"
+              className="gap-2 rounded-lg"
               onClick={() => onStart(session.id, isActive)}
               disabled={isStarting === session.id}
             >
@@ -391,26 +391,26 @@ export default function DoctorDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Premium Welcome Header */}
-      <div className="relative overflow-hidden p-8 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-secondary/5 border border-primary/20 animate-in fade-in duration-500">
-        <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 -mr-8 -mt-8">
-          <LayoutDashboard className="w-48 h-48 text-primary" />
-        </div>
+      {/* Welcome Header */}
+      <div className="relative overflow-hidden p-8 rounded-2xl bg-card border shadow-card-lg">
 
-        <div className="relative flex flex-col xl:flex-row xl:items-center justify-between gap-8">
+        <div className="relative flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           <div className="space-y-3">
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
-              Welcome, Dr. <span className="text-primary italic">{profile?.first_name}</span>
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold w-fit">
+              <Activity className="w-4 h-4" />
+              Clinical Dashboard
+            </span>
+            <h1 className="text-3xl md:text-4xl font-bold font-heading text-foreground">
+              Welcome, Dr. <span className="text-gradient-primary">{profile?.first_name}</span>
             </h1>
-            <div className="flex flex-wrap items-center gap-4">
-              <p className="text-muted-foreground font-medium">Your clinical command center is ready</p>
-              <div className="h-4 w-[1px] bg-border hidden sm:block" />
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-muted-foreground">Your clinical command center is ready</p>
               {isConnected ? (
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
-                  <Wifi className="w-3 h-3" /> Live Control
+                <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1 px-3 py-1">
+                  <Wifi className="w-3 h-3" /> Live
                 </Badge>
               ) : (
-                <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 gap-1 px-3 py-1">
+                <Badge variant="outline" className="bg-muted text-muted-foreground gap-1 px-3 py-1">
                   <WifiOff className="w-3 h-3" /> Offline
                 </Badge>
               )}
@@ -418,33 +418,24 @@ export default function DoctorDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="default"
-              className="rounded-full px-6 bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300 font-bold"
-            >
-              <Activity className="w-4 h-4 mr-2" />
+            <Button variant="hero" className="rounded-xl px-5 gap-2">
+              <Activity className="w-4 h-4" />
               Dashboard
             </Button>
             <Button
               variant="outline"
-              className="rounded-full px-6 border-primary/20 hover:bg-primary hover:text-white transition-all duration-300 font-bold"
+              className="rounded-xl px-5 gap-2 font-semibold"
               onClick={() => navigate("/doctor/sessions")}
             >
-              <CalendarDays className="w-4 h-4 mr-2" />
+              <CalendarDays className="w-4 h-4" />
               Sessions
             </Button>
-            <Button
-              variant="outline"
-              className="rounded-full px-6 border-primary/20 hover:bg-primary hover:text-white transition-all duration-300 font-bold"
-            >
-              <Users className="w-4 h-4 mr-2" />
+            <Button variant="outline" className="rounded-xl px-5 gap-2 font-semibold">
+              <Users className="w-4 h-4" />
               Patients
             </Button>
-            <Button
-              variant="outline"
-              className="rounded-full px-6 border-primary/20 hover:bg-primary hover:text-white transition-all duration-300 font-bold"
-            >
-              <FileBarChart className="w-4 h-4 mr-2" />
+            <Button variant="outline" className="rounded-xl px-5 gap-2 font-semibold">
+              <FileBarChart className="w-4 h-4" />
               Reports
             </Button>
           </div>
@@ -453,20 +444,13 @@ export default function DoctorDashboard() {
 
       {/* Start New Session CTA with Inline Form */}
       <div className="animate-in fade-in duration-500 delay-100">
-        <div className="space-y-4 mb-6">
-          <h2 className="text-3xl font-bold text-foreground">Initiate Patient Session</h2>
-          <p className="text-muted-foreground text-lg">Send a consultation request and begin real-time patient interaction</p>
+        <div className="space-y-2 mb-6">
+          <h2 className="text-2xl font-bold font-heading text-foreground">Initiate Patient Session</h2>
+          <p className="text-muted-foreground">Send a consultation request and begin real-time patient interaction</p>
         </div>
 
         <div className="relative overflow-hidden">
-          <Card className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 border-2 border-dashed border-primary/40 hover:border-primary hover:shadow-xl transition-all duration-300 group">
-            <div className="absolute inset-0 opacity-5 pointer-events-none">
-              <div className="w-full h-full" style={{
-                backgroundImage: `radial-gradient(circle at 25px 25px, currentColor 2px, transparent 0)`,
-                backgroundSize: '50px 50px'
-              }} />
-            </div>
-
+          <Card className="relative overflow-hidden bg-card border shadow-card-lg hover:shadow-glow transition-all duration-300 group rounded-2xl">
             <CardContent className="relative p-10">
               <div className="flex items-center gap-8 min-h-[550px]">
                 {/* Left side - Main CTA or Mic Animation */}
@@ -482,8 +466,8 @@ export default function DoctorDashboard() {
                       </div>
 
                       <div className="space-y-4 mb-12">
-                        <h3 className="text-4xl font-black tracking-tight text-foreground">Ready to Start?</h3>
-                        <p className="text-muted-foreground text-lg max-w-md mx-auto font-medium leading-relaxed">
+                        <h3 className="text-3xl font-bold font-heading text-foreground">Ready to Start?</h3>
+                        <p className="text-muted-foreground max-w-md mx-auto leading-relaxed">
                           Send a personalized consultation request to your patient. They'll receive it immediately and can approve to begin the session.
                         </p>
                       </div>
@@ -491,16 +475,13 @@ export default function DoctorDashboard() {
                       <div className="space-y-4">
                         <Button
                           onClick={() => setShowForm(true)}
+                          variant="hero"
                           size="lg"
-                          className="group/btn relative inline-flex items-center gap-4 px-8 py-7 text-xl font-bold rounded-full shadow-lg shadow-primary/30 transition-all duration-300 active:scale-95 hover:shadow-xl hover:shadow-primary/40"
+                          className="gap-3 px-8 py-6 text-lg rounded-xl"
                         >
-                          
-                          <span className="relative z-10 flex items-center gap-3">
-                            <Mic className="w-5 h-5" />
-                            Create Session Request
-                          </span>
+                          <Mic className="w-5 h-5" />
+                          Create Session Request
                         </Button>
-                        <p className="text-xs text-muted-foreground font-medium">Less than 1 minute to complete</p>
                       </div>
                     </div>
                   ) : (
@@ -523,20 +504,119 @@ export default function DoctorDashboard() {
                   )}
                 </div>
 
-                {/* Right side - Form (fixed width, fades in/out) */}
+                {/* Right side - Illustration or Form */}
                 <div className="w-1/2 transition-all duration-500 ease-in-out">
+                  {!showForm && !showMicAnimation && (
+                    <div className="flex items-center justify-center h-full animate-in fade-in duration-500">
+                      <svg viewBox="0 0 480 420" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full max-w-md opacity-90">
+                        {/* Background circle glow */}
+                        <circle cx="240" cy="210" r="180" fill="url(#ctaGlow)" opacity="0.12" />
+                        <circle cx="240" cy="210" r="130" fill="url(#ctaGlow)" opacity="0.08" />
+
+                        {/* Central monitor / screen */}
+                        <rect x="145" y="95" width="190" height="135" rx="14" fill="hsl(200, 45%, 10%)" stroke="hsl(168, 70%, 34%)" strokeWidth="2" />
+                        <rect x="155" y="105" width="170" height="110" rx="8" fill="hsl(200, 50%, 6%)" />
+                        {/* Monitor stand */}
+                        <rect x="220" y="230" width="40" height="20" rx="2" fill="hsl(200, 30%, 18%)" />
+                        <rect x="200" y="248" width="80" height="6" rx="3" fill="hsl(200, 30%, 18%)" />
+
+                        {/* Waveform on screen */}
+                        <path d="M170 155 L185 155 L192 135 L200 170 L208 125 L216 175 L224 140 L232 165 L240 130 L248 170 L256 145 L264 160 L272 150 L280 155 L295 155" stroke="hsl(168, 65%, 45%)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.9">
+                          <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+                        </path>
+
+                        {/* Text lines on screen (EMR notes) */}
+                        <rect x="170" y="175" width="80" height="4" rx="2" fill="hsl(160, 20%, 90%)" opacity="0.5" />
+                        <rect x="170" y="185" width="60" height="4" rx="2" fill="hsl(160, 20%, 90%)" opacity="0.35" />
+                        <rect x="170" y="195" width="70" height="4" rx="2" fill="hsl(160, 20%, 90%)" opacity="0.25" />
+                        {/* AI badge on screen */}
+                        <rect x="270" y="175" width="40" height="18" rx="9" fill="hsl(168, 70%, 34%)" opacity="0.8" />
+                        <text x="290" y="188" textAnchor="middle" fill="white" fontSize="9" fontWeight="700" fontFamily="sans-serif">AI</text>
+
+                        {/* Doctor avatar - left */}
+                        <circle cx="85" cy="195" r="32" fill="hsl(168, 70%, 34%)" opacity="0.15" />
+                        <circle cx="85" cy="185" r="14" fill="hsl(168, 70%, 34%)" opacity="0.6" />
+                        <path d="M60 220 Q60 200 85 200 Q110 200 110 220" fill="hsl(168, 70%, 34%)" opacity="0.5" />
+                        {/* Stethoscope icon hint */}
+                        <circle cx="95" cy="210" r="5" stroke="hsl(168, 65%, 45%)" strokeWidth="1.5" fill="none" opacity="0.7" />
+
+                        {/* Patient avatar - right */}
+                        <circle cx="395" cy="195" r="32" fill="hsl(36, 90%, 55%)" opacity="0.15" />
+                        <circle cx="395" cy="185" r="14" fill="hsl(36, 90%, 55%)" opacity="0.5" />
+                        <path d="M370 220 Q370 200 395 200 Q420 200 420 220" fill="hsl(36, 90%, 55%)" opacity="0.4" />
+
+                        {/* Connection lines - doctor to screen */}
+                        <path d="M117 195 L145 160" stroke="hsl(168, 65%, 45%)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.4">
+                          <animate attributeName="strokeDashoffset" values="0;-14" dur="2s" repeatCount="indefinite" />
+                        </path>
+                        {/* Connection lines - patient to screen */}
+                        <path d="M363 195 L335 160" stroke="hsl(36, 85%, 55%)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.4">
+                          <animate attributeName="strokeDashoffset" values="0;-14" dur="2s" repeatCount="indefinite" />
+                        </path>
+
+                        {/* Voice/sound waves from doctor */}
+                        <path d="M115 182 Q125 175 125 182 Q125 189 115 182" stroke="hsl(168, 65%, 45%)" strokeWidth="1.2" fill="none" opacity="0.5">
+                          <animate attributeName="opacity" values="0.2;0.7;0.2" dur="1.5s" repeatCount="indefinite" />
+                        </path>
+                        <path d="M120 175 Q133 168 133 182 Q133 196 120 189" stroke="hsl(168, 65%, 45%)" strokeWidth="1" fill="none" opacity="0.3">
+                          <animate attributeName="opacity" values="0.1;0.5;0.1" dur="1.5s" begin="0.3s" repeatCount="indefinite" />
+                        </path>
+
+                        {/* Microphone icon below screen */}
+                        <rect x="232" y="275" width="16" height="22" rx="8" stroke="hsl(168, 70%, 34%)" strokeWidth="2" fill="hsl(168, 70%, 34%)" opacity="0.25" />
+                        <path d="M225 290 Q225 305 240 305 Q255 305 255 290" stroke="hsl(168, 70%, 34%)" strokeWidth="2" fill="none" opacity="0.4" />
+                        <line x1="240" y1="305" x2="240" y2="315" stroke="hsl(168, 70%, 34%)" strokeWidth="2" opacity="0.4" />
+
+                        {/* Floating doc icons */}
+                        <g opacity="0.35">
+                          <rect x="60" y="280" width="28" height="34" rx="4" fill="hsl(200, 45%, 10%)" stroke="hsl(168, 65%, 45%)" strokeWidth="1" />
+                          <rect x="66" y="290" width="16" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.6" />
+                          <rect x="66" y="295" width="12" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.4" />
+                          <rect x="66" y="300" width="14" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.3" />
+                          <animate attributeName="transform" values="translate(0,0);translate(0,-6);translate(0,0)" dur="4s" repeatCount="indefinite" />
+                        </g>
+
+                        <g opacity="0.3">
+                          <rect x="385" y="270" width="28" height="34" rx="4" fill="hsl(200, 45%, 10%)" stroke="hsl(36, 85%, 55%)" strokeWidth="1" />
+                          <rect x="391" y="280" width="16" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.6" />
+                          <rect x="391" y="285" width="12" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.4" />
+                          <rect x="391" y="290" width="14" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.3" />
+                          <animate attributeName="transform" values="translate(0,0);translate(0,-6);translate(0,0)" dur="4s" begin="1s" repeatCount="indefinite" />
+                        </g>
+
+                        {/* Shield / security icon */}
+                        <g transform="translate(228, 340)" opacity="0.3">
+                          <path d="M12 0 L24 6 L24 16 Q24 26 12 30 Q0 26 0 16 L0 6 Z" fill="hsl(168, 70%, 34%)" opacity="0.3" stroke="hsl(168, 65%, 45%)" strokeWidth="1.2" />
+                          <path d="M8 15 L11 18 L17 12" stroke="hsl(168, 65%, 45%)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        </g>
+
+                        {/* Labels */}
+                        <text x="85" y="260" textAnchor="middle" fill="hsl(168, 65%, 45%)" fontSize="10" fontWeight="600" fontFamily="sans-serif" opacity="0.7">Doctor</text>
+                        <text x="395" y="260" textAnchor="middle" fill="hsl(36, 85%, 55%)" fontSize="10" fontWeight="600" fontFamily="sans-serif" opacity="0.7">Patient</text>
+                        <text x="240" y="390" textAnchor="middle" fill="hsl(200, 15%, 55%)" fontSize="10" fontWeight="500" fontFamily="sans-serif" opacity="0.5">Voice-First AI Documentation</text>
+
+                        {/* Gradient defs */}
+                        <defs>
+                          <radialGradient id="ctaGlow" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stopColor="hsl(168, 70%, 34%)" />
+                            <stop offset="100%" stopColor="hsl(168, 70%, 34%)" stopOpacity="0" />
+                          </radialGradient>
+                        </defs>
+                      </svg>
+                    </div>
+                  )}
                   {showForm && !showMicAnimation && (
-                    <div className="bg-white dark:bg-gray-950 rounded-2xl p-8 border border-primary/30 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
+                    <div className="bg-card rounded-2xl p-8 border shadow-card-lg animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
                       {/* Form Header */}
-                      <div className="space-y-2 pb-4 border-b border-primary/10">
+                      <div className="space-y-2 pb-4 border-b border-border">
                         <div className="flex items-center justify-between">
-                          <h4 className="text-2xl font-bold text-foreground">New Request</h4>
+                          <h4 className="text-2xl font-bold font-heading text-foreground">New Request</h4>
                           <button
                             onClick={closeForm}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+                            className="p-2 rounded-lg hover:bg-muted transition-colors"
                             title="Close form"
                           >
-                            <X className="w-5 h-5 text-gray-500" />
+                            <X className="w-5 h-5 text-muted-foreground" />
                           </button>
                         </div>
                         <p className="text-sm text-muted-foreground">Step 1 of 3 - Patient Information</p>
@@ -556,14 +636,14 @@ export default function DoctorDashboard() {
                             placeholder="patient@example.com"
                             value={formData.email}
                             onChange={(e) => handleFormChange("email", e.target.value)}
-                            className={`h-11 text-base rounded-lg border transition-all ${
+                            className={`h-11 rounded-lg transition-all ${
                               formErrors.email
-                                ? "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500 focus:ring-red-500"
-                                : "border-gray-200 dark:border-gray-800 focus:border-primary focus:ring-primary"
+                                ? "border-destructive bg-destructive/5 focus:border-destructive"
+                                : ""
                             }`}
                           />
                           {formErrors.email && (
-                            <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 mt-2 animate-in fade-in">
+                            <div className="flex items-center gap-2 text-sm text-destructive mt-2 animate-in fade-in">
                               <AlertTriangle className="w-4 h-4 shrink-0" />
                               <span>{formErrors.email}</span>
                             </div>
@@ -581,24 +661,24 @@ export default function DoctorDashboard() {
                             placeholder="Describe the primary reason for this consultation..."
                             value={formData.chiefComplaint}
                             onChange={(e) => handleFormChange("chiefComplaint", e.target.value)}
-                            className={`min-h-[100px] text-base rounded-lg border resize-none transition-all ${
+                            className={`min-h-[100px] rounded-lg resize-none transition-all ${
                               formErrors.chiefComplaint
-                                ? "border-red-500 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500 focus:ring-red-500"
-                                : "border-gray-200 dark:border-gray-800 focus:border-primary focus:ring-primary"
+                                ? "border-destructive bg-destructive/5 focus:border-destructive"
+                                : ""
                             }`}
                           />
                           <div className="flex items-center justify-between">
                             {formErrors.chiefComplaint && (
-                              <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 animate-in fade-in">
+                              <div className="flex items-center gap-2 text-sm text-destructive animate-in fade-in">
                                 <AlertTriangle className="w-4 h-4 shrink-0" />
                                 <span>{formErrors.chiefComplaint}</span>
                               </div>
                             )}
                             <span className={`text-xs font-medium ml-auto transition-colors ${
                               formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH
-                                ? "text-red-600 dark:text-red-400"
+                                ? "text-destructive"
                                 : formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH * 0.8
-                                ? "text-yellow-600 dark:text-yellow-400"
+                                ? "text-accent"
                                 : "text-muted-foreground"
                             }`}>
                               {formData.chiefComplaint.length}/{COMPLAINT_MAX_LENGTH}
@@ -607,21 +687,21 @@ export default function DoctorDashboard() {
                         </div>
 
                         {/* Emergency Flag */}
-                        <div className={`flex items-center gap-3 p-4 rounded-lg border transition-all ${
+                        <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
                           formData.isEmergency
-                            ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
-                            : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
+                            ? "bg-destructive/5 border-destructive/20"
+                            : "bg-muted border-border"
                         }`}>
                           <input
                             type="checkbox"
                             id="emergency"
                             checked={formData.isEmergency}
                             onChange={(e) => handleFormChange("isEmergency", e.target.checked)}
-                            className="w-5 h-5 rounded cursor-pointer border-gray-300 text-red-600 focus:ring-red-500"
+                            className="w-5 h-5 rounded cursor-pointer accent-destructive"
                           />
                           <Label htmlFor="emergency" className="flex items-center gap-2 font-semibold cursor-pointer flex-1">
-                            <AlertTriangle className={`w-4 h-4 ${formData.isEmergency ? "text-red-600" : "text-gray-500"}`} />
-                            <span className={formData.isEmergency ? "text-red-700 dark:text-red-400" : "text-gray-700 dark:text-gray-300"}>
+                            <AlertTriangle className={`w-4 h-4 ${formData.isEmergency ? "text-destructive" : "text-muted-foreground"}`} />
+                            <span className={formData.isEmergency ? "text-destructive" : "text-foreground"}>
                               Mark as Emergency Priority
                             </span>
                           </Label>
@@ -629,7 +709,7 @@ export default function DoctorDashboard() {
 
                         {/* Error Alert */}
                         {error && (
-                          <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm flex items-start gap-3 animate-in fade-in">
+                          <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-start gap-3 animate-in fade-in">
                             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
                               <p className="font-semibold">Request Failed</p>
@@ -641,8 +721,9 @@ export default function DoctorDashboard() {
                         {/* Submit Button */}
                         <Button
                           onClick={handleCreateSession}
+                          variant="hero"
                           disabled={!formData.email.trim() || isCreating || requestSent || Object.keys(formErrors).length > 0}
-                          className="w-full h-12 text-base font-bold rounded-lg gap-2 shadow-lg transition-all hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full h-12 rounded-xl gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isCreating ? (
                             <>
@@ -668,21 +749,17 @@ export default function DoctorDashboard() {
                   {showForm && showMicAnimation && (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center space-y-6 animate-in fade-in duration-500">
-                        <div className="relative mx-auto w-20 h-20">
-                          <div className="absolute inset-0 bg-green-500/20 rounded-full animate-pulse" />
-                          <div className="absolute inset-0 rounded-full border-2 border-green-500 animate-spin" style={{ animationDuration: "3s" }} />
-                          <div className="absolute inset-3 bg-green-500 rounded-full flex items-center justify-center">
-                            <CheckCircle className="w-10 h-10 text-white" />
-                          </div>
+                        <div className="p-4 rounded-full bg-primary/10">
+                          <CheckCircle className="w-8 h-8 text-primary" />
                         </div>
                         <div className="space-y-2">
-                          <h4 className="text-xl font-bold text-foreground">Request Sent!</h4>
+                          <h4 className="text-xl font-bold font-heading text-foreground">Request Sent!</h4>
                           <p className="text-sm text-muted-foreground max-w-xs">
                             Waiting for patient approval. You'll be notified when they respond.
                           </p>
                         </div>
-                        <Badge className="bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400 border-0 px-3 py-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2" />
+                        <Badge className="bg-primary/10 text-primary border-0 px-3 py-1">
+                          <div className="w-2 h-2 bg-primary rounded-full animate-pulse mr-2" />
                           Pending Approval
                         </Badge>
                       </div>
@@ -691,44 +768,44 @@ export default function DoctorDashboard() {
 
                   {isRecording && (
                     <div className="flex items-center justify-center h-full">
-                      <div className="w-full p-8 rounded-2xl bg-gradient-to-br from-red-50 to-red-50/50 dark:from-red-950/30 dark:to-red-950/20 border border-red-200 dark:border-red-800 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                      <div className="w-full p-8 rounded-2xl bg-destructive/5 border border-destructive/20 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h4 className="text-xl font-bold text-red-700 dark:text-red-400">Recording Session</h4>
-                            <p className="text-sm text-red-600 dark:text-red-500 mt-1">Audio is being captured and streamed</p>
+                            <h4 className="text-xl font-bold font-heading text-destructive">Recording Session</h4>
+                            <p className="text-sm text-destructive/70 mt-1">Audio is being captured and streamed</p>
                           </div>
                           <button
                             onClick={stopRecording}
-                            className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 transition-colors flex-shrink-0"
+                            className="p-2 rounded-lg hover:bg-destructive/10 transition-colors flex-shrink-0"
                             title="Stop recording"
                           >
-                            <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                            <X className="w-5 h-5 text-destructive" />
                           </button>
                         </div>
 
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1 bg-red-200 dark:bg-red-900 rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-red-500 via-red-400 to-red-500 animate-pulse" />
+                            <div className="flex-1 h-1 bg-destructive/20 rounded-full overflow-hidden">
+                              <div className="h-full bg-destructive animate-pulse" />
                             </div>
                           </div>
                           <div className="flex items-center justify-center gap-1.5 py-4">
-                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-1" />
-                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-2" style={{animationDelay: '0.1s'}} />
-                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-3" style={{animationDelay: '0.2s'}} />
-                            <div className="w-2 bg-red-600 rounded-full animate-recording-bar-4" style={{animationDelay: '0.3s'}} />
+                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-1" />
+                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-2" style={{animationDelay: '0.1s'}} />
+                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-3" style={{animationDelay: '0.2s'}} />
+                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-4" style={{animationDelay: '0.3s'}} />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 pt-2">
-                          <div className="text-center p-3 rounded-lg bg-white/50 dark:bg-gray-900/50">
+                          <div className="text-center p-3 rounded-xl bg-card border">
                             <p className="text-xs text-muted-foreground mb-1">Status</p>
-                            <p className="text-sm font-bold text-red-600 dark:text-red-400">
-                              <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse inline-block mr-2" />
+                            <p className="text-sm font-bold text-destructive">
+                              <span className="w-2 h-2 bg-destructive rounded-full animate-pulse inline-block mr-2" />
                               Live
                             </p>
                           </div>
-                          <div className="text-center p-3 rounded-lg bg-white/50 dark:bg-gray-900/50">
+                          <div className="text-center p-3 rounded-xl bg-card border">
                             <p className="text-xs text-muted-foreground mb-1">Patient Session</p>
                             <p className="text-sm font-bold text-foreground">{recordingSessionId ? 'Active' : 'N/A'}</p>
                           </div>
@@ -737,7 +814,7 @@ export default function DoctorDashboard() {
                         <Button
                           onClick={stopRecording}
                           variant="destructive"
-                          className="w-full gap-2 font-semibold"
+                          className="w-full gap-2 rounded-xl font-semibold"
                         >
                           <StopCircle className="w-4 h-4" />
                           Stop Recording
@@ -752,208 +829,63 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Stats - Premium Visuals */}
+      {/* Stats Overview */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-foreground">Session Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in-up duration-700 delay-200">
+        <h2 className="text-2xl font-bold font-heading text-foreground">Session Overview</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {loading ? (
             [1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-40 w-full rounded-xl" />
+              <Skeleton key={i} className="h-36 w-full rounded-xl" />
             ))
           ) : (
             <>
-              <Card className="group hover:border-green-500/50 hover:shadow-2xl hover:shadow-green-500/10 transition-all duration-500 rounded-xl overflow-hidden relative border-green-200/50 dark:border-green-900/30">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
+              <Card className="group hover:shadow-card-lg hover:border-primary/30 transition-all duration-300 shadow-card rounded-xl overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <div>
-                    <CardTitle className="text-sm font-semibold text-muted-foreground tracking-widest uppercase">Active Sessions</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">Currently in progress</p>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Active Sessions</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Currently in progress</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all duration-300">
+                  <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
                     <Activity className="w-5 h-5" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-5xl font-black text-foreground">{activeSessions.length}</p>
+                  <p className="text-4xl font-bold font-heading text-foreground">{activeSessions.length}</p>
                 </CardContent>
               </Card>
 
-              <Card className="group hover:border-yellow-500/50 hover:shadow-2xl hover:shadow-yellow-500/10 transition-all duration-500 rounded-xl overflow-hidden relative border-yellow-200/50 dark:border-yellow-900/30">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
+              <Card className="group hover:shadow-card-lg hover:border-accent/30 transition-all duration-300 shadow-card rounded-xl overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <div>
-                    <CardTitle className="text-sm font-semibold text-muted-foreground tracking-widest uppercase">Pending Requests</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">Awaiting approval</p>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Pending Requests</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Awaiting approval</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/40 text-yellow-600 group-hover:bg-yellow-600 group-hover:text-white transition-all duration-300">
+                  <div className="p-2.5 rounded-xl bg-accent/10 text-accent group-hover:bg-accent group-hover:text-white transition-all duration-300">
                     <Clock className="w-5 h-5" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-5xl font-black text-foreground">{pendingSessions.length}</p>
+                  <p className="text-4xl font-bold font-heading text-foreground">{pendingSessions.length}</p>
                 </CardContent>
               </Card>
 
-              <Card className="group hover:border-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 rounded-xl overflow-hidden relative border-purple-200/50 dark:border-purple-900/30">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-700" />
+              <Card className="group hover:shadow-card-lg hover:border-primary/30 transition-all duration-300 shadow-card rounded-xl overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <div>
-                    <CardTitle className="text-sm font-semibold text-muted-foreground tracking-widest uppercase">Completed</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">EMR generated by AI</p>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">EMR generated by AI</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">
+                  <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
                     <FileBarChart className="w-5 h-5" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-5xl font-black text-foreground">{completedSessions.length}</p>
+                  <p className="text-4xl font-bold font-heading text-foreground">{completedSessions.length}</p>
                 </CardContent>
               </Card>
             </>
           )}
         </div>
-      </div>
-
-      {/* Active / Accepted Sessions */}
-      {
-        activeSessions.length > 0 && (
-          <div className="animate-in fade-in-up duration-700 delay-300 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-50 dark:bg-green-950/40">
-                    <Activity className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  Active Sessions
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">{activeSessions.length} session{activeSessions.length !== 1 ? 's' : ''} in progress</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {activeSessions.map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  onStart={handleStartSession}
-                  isStarting={isStarting}
-                />
-              ))}
-            </div>
-          </div>
-        )
-      }
-
-      {/* Pending Sessions */}
-      {
-        pendingSessions.length > 0 && (
-          <div className="animate-in fade-in-up duration-700 delay-350 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-yellow-50 dark:bg-yellow-950/40">
-                    <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  Pending Approvals
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">Waiting for patient response on {pendingSessions.length} request{pendingSessions.length !== 1 ? 's' : ''}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {pendingSessions.map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  onStart={handleStartSession}
-                  isStarting={isStarting}
-                />
-              ))}
-            </div>
-          </div>
-        )
-      }
-
-      {/* Recent / All Sessions */}
-      <div className="animate-in fade-in-up duration-700 delay-400 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">All Sessions</h2>
-            <p className="text-sm text-muted-foreground mt-1">{sessions.length} total session{sessions.length !== 1 ? 's' : ''}</p>
-          </div>
-          {error && <span className="text-sm text-destructive font-semibold bg-red-50 dark:bg-red-950/30 px-3 py-1 rounded-lg">{error}</span>}
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 w-full rounded-lg" />)}
-          </div>
-        ) : sessions.length === 0 ? (
-          <Card className="border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
-            <CardContent className="py-16 text-center">
-              <div className="mx-auto w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center mb-6">
-                <FileText className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-bold text-foreground">No Sessions Yet</h3>
-              <p className="text-muted-foreground max-w-sm mx-auto mt-2">
-                Create your first session request above to begin consulting with patients. You'll see all sessions listed here.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {sessions.map((session) => (
-              <SessionCard
-                key={session.id}
-                session={session}
-                onStart={handleStartSession}
-                isStarting={isStarting}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quick Summary */}
-      <div className="animate-in fade-in-up duration-700 delay-500">
-        <Card className="border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-secondary/5 backdrop-blur-sm overflow-hidden">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl flex items-center gap-2 text-foreground">
-              <BarChart3 className="w-5 h-5 text-primary" />
-              Today&apos;s Metrics
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">Quick overview of your session metrics</p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="p-5 rounded-lg bg-background border border-green-200/50 dark:border-green-900/30 hover:border-green-500/50 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-green-50 dark:bg-green-950/40">
-                    <Activity className="w-4 h-4 text-green-600" />
-                  </div>
-                  <p className="text-sm font-semibold text-muted-foreground">Active</p>
-                </div>
-                <p className="text-3xl font-bold text-green-600">{activeSessions.length}</p>
-              </div>
-              <div className="p-5 rounded-lg bg-background border border-yellow-200/50 dark:border-yellow-900/30 hover:border-yellow-500/50 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-yellow-50 dark:bg-yellow-950/40">
-                    <Clock className="w-4 h-4 text-yellow-600" />
-                  </div>
-                  <p className="text-sm font-semibold text-muted-foreground">Pending</p>
-                </div>
-                <p className="text-3xl font-bold text-yellow-600">{pendingSessions.length}</p>
-              </div>
-              <div className="p-5 rounded-lg bg-background border border-purple-200/50 dark:border-purple-900/30 hover:border-purple-500/50 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40">
-                    <FileBarChart className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <p className="text-sm font-semibold text-muted-foreground">Completed</p>
-                </div>
-                <p className="text-3xl font-bold text-purple-600">{completedSessions.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
