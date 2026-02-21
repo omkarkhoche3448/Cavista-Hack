@@ -16,6 +16,10 @@ import {
   Pill,
   AlertTriangle,
   ClipboardList,
+  ArrowLeft,
+  Mic,
+  Stethoscope,
+  User,
 } from "lucide-react";
 import { getSession } from "@/services/sessionService";
 import { listDocuments, shareDocuments, uploadDocument } from "@/services/documentService";

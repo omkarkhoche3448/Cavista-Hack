@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
+import uuid
 
 from ..db import get_supabase
 from ..oauth2 import get_current_user, require_role
@@ -314,6 +315,7 @@ async def approve_patient_summary(
         # Create notification
         try:
             supabase.table("notifications").insert({
+                "id": str(uuid.uuid4()),
                 "recipient_id": patient_id,
                 "sender_id": current_user["id"],
                 "session_id": summary.data["session_id"],

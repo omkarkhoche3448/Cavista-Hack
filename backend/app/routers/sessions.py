@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query, UploadFile, File
 from jose import jwt, JWTError
 from supabase import Client
+import requests
+import uuid
 
 from ..db import get_supabase
 from ..oauth2 import get_current_user, require_role, _get_signing_key
@@ -218,6 +220,7 @@ async def create_session(
 
     # Create notification for patient
     notification = {
+        "id": str(uuid.uuid4()),
         "recipient_id": patient_id,
         "sender_id": doctor_id,
         "session_id": session["id"],
@@ -401,7 +404,7 @@ async def end_session(
     await manager.send_to_user(patient_id, "SESSION_ENDED", ws_payload)
     await manager.send_to_user(current_user["id"], "SESSION_ENDED", ws_payload)
 
-    # ── AI Pipeline ──
+    # ── AI Pipeline (Now using External API) ──
     try:
         # 1. Compile transcript
         chunks = (
@@ -476,7 +479,7 @@ async def end_session(
         if diagnoses:
             icd_mappings = ai_service.map_icd_codes(diagnoses, transcript[:2000] if transcript else "")
             for mapping in icd_mappings:
-                supabase.table("icd_mappings").insert({
+                icd_payload = {
                     "session_id": body.session_id,
                     "emr_draft_id": draft_id,
                     "diagnosis_text": mapping.get("diagnosis_text", ""),
@@ -486,7 +489,8 @@ async def end_session(
                     "is_primary": mapping.get("is_primary", False),
                     "match_method": "llm",
                     "approval_status": "pending",
-                }).execute()
+                }
+                supabase.table("icd_mappings").insert(icd_payload).execute()
 
         # 5. Treatment suggestions
         treatments = ai_service.suggest_treatments(
@@ -494,8 +498,8 @@ async def end_session(
             patient_context=transcript[:2000] if transcript else "",
             current_medications=emr_content.get("medications"),
         )
-        for tx in treatments:
-            supabase.table("treatment_suggestions").insert({
+        treatment_data = [
+            {
                 "session_id": body.session_id,
                 "emr_draft_id": draft_id,
                 "suggestion_type": tx.get("suggestion_type"),
@@ -507,7 +511,11 @@ async def end_session(
                 "contraindications": tx.get("contraindications"),
                 "model_used": "gemini-2.0-flash",
                 "approval_status": "pending",
-            }).execute()
+            }
+            for tx in treatments
+        ]
+        if treatment_data:
+            supabase.table("treatment_suggestions").insert(treatment_data).execute()
 
         # 6. Patient-friendly summary
         summary = ai_service.generate_patient_summary(
@@ -712,16 +720,30 @@ async def upload_recording(
         # Construct S3 URL (using virtual-host style)
         recording_url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{uploaded_key}"
         
-        # Update database with the recording URL
+        # ── Update Session Record (Optional - Won't fail if column is missing) ──
         try:
-            db_res = supabase.table("sessions").update({"recording_url": recording_url}).eq("id", session_id).execute()
-            logger.info(f"Recording for session {session_id} saved to S3 and DB: {recording_url}")
+            supabase.table("sessions").update({"recording_url": recording_url}).eq("id", session_id).execute()
         except Exception as db_err:
-             # Log but don't fail the whole request because the S3 upload succeeded
-             logger.error(f"Failed to update session with recording URL in DB (Check if 'recording_url' column exists): {db_err}")
-        
+            logger.warning(f"Note: Recording URL not saved to DB (column might be missing): {db_err}")
+
+        # ── Notify External Analysis API ──
+        try:
+            analysis_url = f"{settings.ANALYSIS_API_URL}/ai/process-session"
+            requests.post(
+                analysis_url,
+                json={
+                    "session_id": session_id,
+                    "recording_url": recording_url,
+                    "doctor_id": current_user["id"]
+                },
+                timeout=10 # Fast timeout
+            )
+            logger.info(f"Notified analysis API for session {session_id}")
+        except Exception as api_err:
+            logger.error(f"Failed to notify analysis API: {api_err}")
+
         return {
-            "status": "success", 
+            "status": "success",
             "recording_url": recording_url,
             "session_id": session_id
         }

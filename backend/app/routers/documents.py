@@ -295,7 +295,7 @@ async def share_documents(
             raw = doc.get("ocr_extracted_text")
             if raw:
                 analysis = json.loads(raw)
-                supabase.from_("pre_session_insights").insert({
+                supabase.table("pre_session_insights").insert({
                     "session_id": body.session_id,
                     "document_id": doc["id"],
                     "summary": analysis.get("summary"),
