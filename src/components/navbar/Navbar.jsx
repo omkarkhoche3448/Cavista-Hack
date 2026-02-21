@@ -28,12 +28,6 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-6">
-          <nav className="hidden md:flex items-center gap-6">
-            <Link to="/home" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors">Process</Link>
-            <Link to="/home" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors">Features</Link>
-            <Link to="/home" className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors">Security</Link>
-          </nav>
-
           <div className="h-6 w-[1px] bg-border/60 hidden md:block" />
 
           <div className="flex items-center gap-3">

@@ -3,4 +3,5 @@ export { default as LoginPage } from "./LoginPage";
 export { default as SignupPage } from "./SignupPage";
 export { default as AuthCallback } from "./AuthCallback";
 export { default as ProtectedRoute } from "./ProtectedRoute";
+export { default as GuestRoute } from "./GuestRoute";
 export { default as RoleRoute } from "./RoleRoute";

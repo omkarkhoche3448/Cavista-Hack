@@ -7,29 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   FileText,
-  CalendarDays,
   ClipboardList,
   Bell,
-  Upload,
-  Loader2,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Wifi,
   WifiOff,
   Eye,
-  Search,
   Plus,
   Activity,
-  User,
   ShieldCheck,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listSessions, respondToSession } from "@/services/sessionService";
-import { listDocuments, uploadDocument } from "@/services/documentService";
-import FileUploadModal from "./FileUploadModal";
-import SessionRequestCard from "./SessionRequestCard";
-import SummaryModal from "./SummaryModal";
+import { listDocuments } from "@/services/documentService";
+import FileUploadModal from "../../features/patient-dashboard/FileUploadModal";
+import SessionRequestCard from "../../features/patient-dashboard/SessionRequestCard";
+import SummaryModal from "../../features/patient-dashboard/SummaryModal";
 // SessionInvitationModal removed, it's now in DashboardLayout for global coverage
 
 const STATUS_BADGE = {

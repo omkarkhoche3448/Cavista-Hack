@@ -24,10 +24,10 @@ import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 
-export default function SessionPage() {
+export default function IndividualSession() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const { session: authSession, profile } = useAuth();
+  const { session: authSession } = useAuth();
   const { subscribe, send } = useWebSocket();
   const token = authSession?.access_token;
 
@@ -196,7 +196,10 @@ export default function SessionPage() {
       if (isRecordingRef.current && recognitionRef.current) {
         try {
           recognition.start();
-        } catch { }
+        } catch (err) {
+          // Silently ignore restart errors
+          console.debug("Speech recognition restart error:", err);
+        }
       }
     };
 
