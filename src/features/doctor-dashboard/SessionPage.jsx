@@ -18,7 +18,7 @@ import {
   User,
   Stethoscope,
 } from "lucide-react";
-import { getSession, endSession, getTranscript } from "@/services/sessionService";
+import { getSession, endSession } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
 
@@ -39,6 +39,7 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true);
 
   const recognitionRef = useRef(null);
+  const isRecordingRef = useRef(false);
   const chunkIndexRef = useRef(0);
   const sessionStartTimeRef = useRef(Date.now());
   const transcriptEndRef = useRef(null);
@@ -157,25 +158,28 @@ export default function SessionPage() {
       console.error("Speech recognition error:", event.error);
       if (event.error === "not-allowed") {
         alert("Microphone access denied. Please allow microphone access.");
+        isRecordingRef.current = false;
         setIsRecording(false);
       }
     };
 
     recognition.onend = () => {
-      // Auto-restart if still recording
-      if (isRecording && recognitionRef.current) {
+      // Auto-restart only if we're still supposed to be recording
+      if (isRecordingRef.current && recognitionRef.current) {
         try {
           recognition.start();
-        } catch {}
+        } catch { }
       }
     };
 
+    isRecordingRef.current = true;
     recognition.start();
     recognitionRef.current = recognition;
     setIsRecording(true);
-  }, [send, sessionId, isRecording]);
+  }, [send, sessionId]);
 
   const stopRecording = useCallback(() => {
+    isRecordingRef.current = false;
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -344,16 +348,14 @@ export default function SessionPage() {
               transcriptChunks.map((chunk, i) => (
                 <div
                   key={i}
-                  className={`flex gap-3 ${
-                    chunk.speaker_role === "doctor" ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex gap-3 ${chunk.speaker_role === "doctor" ? "justify-end" : "justify-start"
+                    }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                      chunk.speaker_role === "doctor"
-                        ? "bg-primary/10 text-foreground"
-                        : "bg-muted text-foreground"
-                    }`}
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${chunk.speaker_role === "doctor"
+                      ? "bg-primary/10 text-foreground"
+                      : "bg-muted text-foreground"
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       {chunk.speaker_role === "doctor" ? (

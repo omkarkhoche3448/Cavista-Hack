@@ -11,14 +11,15 @@ import {
   Upload,
   Check,
   Loader2,
-  ArrowLeft,
-  Mic,
-  User,
-  Stethoscope,
   Share2,
+  Heart,
+  Pill,
+  AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 import { getSession } from "@/services/sessionService";
 import { listDocuments, shareDocuments, uploadDocument } from "@/services/documentService";
+import { getPatientSummary } from "@/services/emrService";
 import FileUploadModal from "./FileUploadModal";
 
 export default function PatientSessionPage() {
@@ -36,10 +37,25 @@ export default function PatientSessionPage() {
   const [sharing, setSharing] = useState(false);
   const [shared, setShared] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   useEffect(() => {
+    async function fetchSummary() {
+      setLoadingSummary(true);
+      try {
+        const data = await getPatientSummary(token, sessionId);
+        setSummary(data);
+      } catch (err) {
+        console.error("Failed to load summary:", err);
+      } finally {
+        setLoadingSummary(false);
+      }
+    }
+
     async function load() {
       if (!token) return;
+      setLoading(true);
       try {
         const [sess, docs] = await Promise.all([
           getSession(token, sessionId),
@@ -47,12 +63,17 @@ export default function PatientSessionPage() {
         ]);
         setSessionData(sess);
         setDocuments(docs);
+
+        if (sess.status === "completed") {
+          fetchSummary();
+        }
       } catch (err) {
         console.error("Failed to load session:", err);
       } finally {
         setLoading(false);
       }
     }
+
     load();
   }, [token, sessionId]);
 
@@ -147,8 +168,8 @@ export default function PatientSessionPage() {
                   sessionData.status === "active"
                     ? "success"
                     : sessionData.status === "accepted"
-                    ? "info"
-                    : "secondary"
+                      ? "info"
+                      : "secondary"
                 }
               >
                 {sessionData.status}
@@ -177,21 +198,104 @@ export default function PatientSessionPage() {
       </div>
 
       {isEnded && (
-        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/10">
-          <CardContent className="py-4 text-center">
-            <p className="font-medium">This session has ended.</p>
-            <p className="text-sm text-muted-foreground">
-              Your doctor is reviewing the session. You&apos;ll receive a summary once it&apos;s ready.
-            </p>
-            <Button
-              className="mt-3"
-              variant="outline"
-              onClick={() => navigate("/patient/dashboard")}
-            >
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/10">
+            <CardContent className="py-4 text-center">
+              <p className="font-medium text-blue-800 dark:text-blue-300">
+                {sessionData.status === "completed"
+                  ? "Visit summary is ready for your review."
+                  : "This session has ended. Your doctor is reviewing the details."}
+              </p>
+              {sessionData.status !== "completed" && (
+                <p className="text-sm text-muted-foreground">
+                  You&apos;ll receive a summary once the doctor approves the AI analysis.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {summary && (
+            <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <CardHeader className="border-b">
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-primary" />
+                  Visit Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-6 space-y-8">
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <p className="text-lg leading-relaxed whitespace-pre-wrap">
+                    {summary.summary_text}
+                  </p>
+                </div>
+
+                {summary.key_takeaways?.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <ClipboardList className="w-4 h-4 text-primary" />
+                      Key Takeaways
+                    </h3>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {summary.key_takeaways.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 bg-muted/50 p-3 rounded-lg text-sm">
+                          <Check className="w-4 h-4 text-green-600 mt-0.5" />
+                          <span>{item.point || item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {summary.medications_list?.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Pill className="w-4 h-4 text-primary" />
+                      Medications & Instructions
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {summary.medications_list.map((med, i) => (
+                        <div key={i} className="p-3 border rounded-lg bg-card shadow-sm">
+                          <p className="font-bold text-primary">{med.name}</p>
+                          {med.what_it_does && (
+                            <p className="text-xs text-muted-foreground mb-2 italic">{med.what_it_does}</p>
+                          )}
+                          <p className="text-sm">{med.how_to_take}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {summary.warnings?.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="w-4 h-4" />
+                      Important Precautions
+                    </h3>
+                    {summary.warnings.map((w, i) => (
+                      <div key={i} className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-800 dark:text-red-300">
+                        {w.warning || w}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {summary.follow_up_notes && (
+                  <div className="pt-4 border-t">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Next Steps</h3>
+                    <p className="text-sm">{summary.follow_up_notes}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {loadingSummary && (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -224,19 +328,17 @@ export default function PatientSessionPage() {
                 documents.map((doc) => (
                   <div
                     key={doc.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedDocs.has(doc.id)
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-muted/50"
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedDocs.has(doc.id)
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-muted/50"
+                      }`}
                     onClick={() => !shared && toggleDoc(doc.id)}
                   >
                     <div
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
-                        selectedDocs.has(doc.id)
-                          ? "border-primary bg-primary"
-                          : "border-input"
-                      }`}
+                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selectedDocs.has(doc.id)
+                        ? "border-primary bg-primary"
+                        : "border-input"
+                        }`}
                     >
                       {selectedDocs.has(doc.id) && (
                         <Check className="w-3 h-3 text-primary-foreground" />
@@ -299,16 +401,14 @@ export default function PatientSessionPage() {
               transcriptChunks.map((chunk, i) => (
                 <div
                   key={i}
-                  className={`flex gap-3 ${
-                    chunk.speaker_role === "doctor" ? "justify-start" : "justify-end"
-                  }`}
+                  className={`flex gap-3 ${chunk.speaker_role === "doctor" ? "justify-start" : "justify-end"
+                    }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                      chunk.speaker_role === "doctor"
-                        ? "bg-muted text-foreground"
-                        : "bg-primary/10 text-foreground"
-                    }`}
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${chunk.speaker_role === "doctor"
+                      ? "bg-muted text-foreground"
+                      : "bg-primary/10 text-foreground"
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       {chunk.speaker_role === "doctor" ? (

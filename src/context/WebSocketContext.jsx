@@ -8,32 +8,56 @@ export function WebSocketProvider({ children }) {
   const { session, isAuthenticated } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const listenersRef = useRef([]);
+  // Track the token we last connected with so we don't reconnect unnecessarily
+  const connectedTokenRef = useRef(null);
 
   useEffect(() => {
-    if (isAuthenticated && session?.access_token) {
-      wsService.connect(session.access_token);
+    const token = session?.access_token;
 
-      const unsub1 = wsService.on("_connected", () => setIsConnected(true));
-      const unsub2 = wsService.on("_disconnected", () => setIsConnected(false));
-      const unsub3 = wsService.on("NOTIFICATION", (data) => {
-        setNotifications((prev) => [{ ...data, id: Date.now(), read: false }, ...prev]);
-      });
-      const unsub4 = wsService.on("SESSION_REQUESTED", (data) => {
-        setNotifications((prev) => [
-          { ...data, id: Date.now(), read: false, type: "session_request", title: "New Session Request", body: `Dr. ${data.doctor_name} wants to start a session` },
-          ...prev,
-        ]);
-      });
-
-      return () => {
-        unsub1();
-        unsub2();
-        unsub3();
-        unsub4();
-        wsService.disconnect();
-      };
+    if (!isAuthenticated || !token) {
+      // User logged out — disconnect
+      connectedTokenRef.current = null;
+      wsService.disconnect();
+      setIsConnected(false);
+      return;
     }
+
+    // Only (re)connect if the token has actually changed
+    if (connectedTokenRef.current === token) {
+      return;
+    }
+
+    connectedTokenRef.current = token;
+    wsService.connect(token);
+
+    const unsub1 = wsService.on("_connected", () => setIsConnected(true));
+    const unsub2 = wsService.on("_disconnected", () => setIsConnected(false));
+    const unsub3 = wsService.on("NOTIFICATION", (data) => {
+      setNotifications((prev) => [{ ...data, id: Date.now(), read: false }, ...prev]);
+    });
+    const unsub4 = wsService.on("SESSION_REQUESTED", (data) => {
+      setNotifications((prev) => [
+        {
+          ...data,
+          id: Date.now(),
+          read: false,
+          type: "session_request",
+          title: "New Session Request",
+          body: `Dr. ${data.doctor_name} wants to start a session`,
+        },
+        ...prev,
+      ]);
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+      // Don't disconnect here — keep the WS alive across re-renders.
+      // disconnect() is only called when the user logs out (above).
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, session?.access_token]);
 
   const subscribe = useCallback((event, callback) => {

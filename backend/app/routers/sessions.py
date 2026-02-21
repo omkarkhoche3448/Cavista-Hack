@@ -546,8 +546,8 @@ def list_sessions(
     user_id = current_user["id"]
 
     query = supabase.table("sessions").select(
-        "*, doctor:users!sessions_doctor_id_fkey(first_name, last_name, email), "
-        "patient:users!sessions_patient_id_fkey(first_name, last_name, email)"
+        "*, doctor:users!doctor_id(first_name, last_name, email), "
+        "patient:users!patient_id(first_name, last_name, email)"
     )
 
     if role == "doctor":
@@ -584,8 +584,8 @@ def get_session(
     session = (
         supabase.table("sessions")
         .select(
-            "*, doctor:users!sessions_doctor_id_fkey(first_name, last_name, email), "
-            "patient:users!sessions_patient_id_fkey(first_name, last_name, email)"
+            "*, doctor:users!doctor_id(first_name, last_name, email), "
+            "patient:users!patient_id(first_name, last_name, email)"
         )
         .eq("id", session_id)
         .single()

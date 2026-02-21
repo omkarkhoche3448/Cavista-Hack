@@ -3,36 +3,43 @@ import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import NotificationDropdown from "./NotificationDropdown";
 import SessionRequestDialog from "./SessionRequestDialog";
-import { MOCK_NOTIFICATIONS, MOCK_SESSION_REQUEST } from "../../data/mockData";
+import { useWebSocket } from "@/context/WebSocketContext";
+import { respondToSession } from "@/services/sessionService";
+import { useAuth } from "@/features/auth";
 
 export default function NotificationBell() {
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const { notifications, clearNotification } = useWebSocket();
+  const { session: authSession } = useAuth();
   const [open, setOpen] = useState(false);
   const [sessionDialog, setSessionDialog] = useState(null);
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const token = authSession?.access_token;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   function markAsRead(id) {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
-  }
-
-  function markAllAsRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    // Current context only has clearNotification, which removes it.
+    // In a real app we'd mark as read in DB. For now, we'll just clear it when clicked.
+    clearNotification(id);
   }
 
   function handleNotificationClick(notification) {
-    markAsRead(notification.id);
     if (notification.type === "session_request") {
-      setSessionDialog(MOCK_SESSION_REQUEST);
+      setSessionDialog(notification);
       setOpen(false);
+    } else {
+      markAsRead(notification.id);
     }
   }
 
-  function handleSessionRespond(action) {
-    setSessionDialog(null);
-    // In a real app, this would call the API
+  async function handleSessionRespond(action) {
+    if (!sessionDialog) return;
+    try {
+      await respondToSession(token, { sessionId: sessionDialog.session_id, action });
+      clearNotification(sessionDialog.id);
+      setSessionDialog(null);
+    } catch (err) {
+      console.error("Failed to respond from notification:", err);
+    }
   }
 
   return (

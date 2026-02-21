@@ -9,7 +9,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/features/auth";
@@ -50,16 +49,16 @@ export default function CreateSessionModal({ open, onOpenChange, onCreated }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogClose onClose={() => onOpenChange(false)} />
-      <DialogHeader>
-        <DialogTitle>Start New Session</DialogTitle>
-      </DialogHeader>
-      <DialogContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Start New Session</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="space-y-2">
-            <Label htmlFor="patient-email">Patient Email</Label>
+            <Label htmlFor="modal-patient-email">Patient Email</Label>
             <Input
-              id="patient-email"
+              id="modal-patient-email"
               type="email"
               placeholder="patient@example.com"
               value={patientEmail}
@@ -69,9 +68,9 @@ export default function CreateSessionModal({ open, onOpenChange, onCreated }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="chief-complaint">Chief Complaint (optional)</Label>
+            <Label htmlFor="modal-chief-complaint">Chief Complaint (optional)</Label>
             <Textarea
-              id="chief-complaint"
+              id="modal-chief-complaint"
               placeholder="Brief description of the reason for visit..."
               value={chiefComplaint}
               onChange={(e) => setChiefComplaint(e.target.value)}
@@ -82,12 +81,12 @@ export default function CreateSessionModal({ open, onOpenChange, onCreated }) {
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="emergency"
+              id="modal-emergency"
               checked={isEmergency}
               onChange={(e) => setIsEmergency(e.target.checked)}
               className="rounded border-input"
             />
-            <Label htmlFor="emergency" className="text-sm font-normal">
+            <Label htmlFor="modal-emergency" className="text-sm font-normal cursor-pointer">
               Mark as emergency
             </Label>
           </div>
@@ -98,7 +97,7 @@ export default function CreateSessionModal({ open, onOpenChange, onCreated }) {
             </p>
           )}
 
-          <DialogFooter className="px-0 pb-0">
+          <DialogFooter className="pt-2">
             <Button
               type="button"
               variant="ghost"
@@ -108,7 +107,7 @@ export default function CreateSessionModal({ open, onOpenChange, onCreated }) {
             </Button>
             <Button type="submit" disabled={loading || !patientEmail.trim()}>
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Send Request
+              Send Request to Patient
             </Button>
           </DialogFooter>
         </form>

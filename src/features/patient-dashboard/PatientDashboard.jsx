@@ -21,9 +21,10 @@ import {
 } from "lucide-react";
 import { listSessions, respondToSession } from "@/services/sessionService";
 import { listDocuments, uploadDocument } from "@/services/documentService";
-import { getNotifications } from "@/services/emrService";
 import FileUploadModal from "./FileUploadModal";
 import SessionRequestCard from "./SessionRequestCard";
+import SummaryModal from "./SummaryModal";
+// SessionInvitationModal removed, it's now in DashboardLayout for global coverage
 
 const STATUS_BADGE = {
   pending: { variant: "warning", label: "Pending" },
@@ -35,7 +36,7 @@ const STATUS_BADGE = {
 };
 
 export default function PatientDashboard() {
-  const { profile, session: authSession } = useAuth();
+  const { profile, session: authSession, loading: authLoading } = useAuth();
   const { isConnected, subscribe, notifications: wsNotifications } = useWebSocket();
   const navigate = useNavigate();
   const token = authSession?.access_token;
@@ -43,29 +44,48 @@ export default function PatientDashboard() {
   const [sessions, setSessions] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [selectedSummary, setSelectedSummary] = useState(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   const fetchData = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     try {
+      console.log("[PatientDashboard] Fetching data...");
       const [sessData, docsData] = await Promise.all([
         listSessions(token),
         listDocuments(token).catch(() => []),
       ]);
-      setSessions(sessData);
-      setDocuments(docsData);
-      setPendingRequests(sessData.filter((s) => s.status === "pending"));
+      console.log("[PatientDashboard] API Results:", { sessData, docsData });
+      if (Array.isArray(sessData)) {
+        setSessions(sessData);
+        setPendingRequests(sessData.filter((s) => s.status === "pending"));
+      } else {
+        console.warn("[PatientDashboard] Sessions API returned non-array:", sessData);
+        setSessions([]);
+        setPendingRequests([]);
+      }
+      setDocuments(Array.isArray(docsData) ? docsData : []);
     } catch (err) {
-      console.error("Failed to fetch data:", err);
+      console.error("[PatientDashboard] Failed to fetch data:", err);
+      setError(err.message || "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [authLoading, fetchData]);
 
   // Listen for real-time events — direct state mutations, no refetch
   useEffect(() => {
@@ -80,8 +100,8 @@ export default function PatientDashboard() {
           if (prev.some((s) => s.id === data.session.id)) return prev;
           return [data.session, ...prev];
         });
+        // Popup is now handled by PatientDashboardLayout globally
       } else {
-        // fallback: refetch if we don't have full session data
         fetchData();
       }
     });
@@ -169,6 +189,12 @@ export default function PatientDashboard() {
           Upload Document
         </Button>
       </div>
+
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 rounded-lg text-sm font-medium">
+          {error}
+        </div>
+      )}
 
       {/* Pending Session Requests */}
       {pendingRequests.length > 0 && (
@@ -305,7 +331,10 @@ export default function PatientDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => navigate(`/patient/summary/${s.id}`)}
+                    onClick={() => {
+                      setSelectedSummary(s);
+                      setShowSummaryModal(true);
+                    }}
                     className="gap-1"
                   >
                     <Eye className="w-3 h-3" />
@@ -322,6 +351,12 @@ export default function PatientDashboard() {
         open={showUpload}
         onOpenChange={setShowUpload}
         onUploaded={handleFileUploaded}
+      />
+
+      <SummaryModal
+        open={showSummaryModal}
+        onOpenChange={setShowSummaryModal}
+        session={selectedSummary}
       />
     </div>
   );

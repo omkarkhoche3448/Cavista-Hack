@@ -8,10 +8,40 @@ import { signOut } from "@/services/authService";
 import { HeartPulse, LogOut } from "lucide-react";
 import PatientSidebar from "./PatientSidebar";
 import NotificationBell from "./notifications/NotificationBell";
+import { useWebSocket } from "@/context/WebSocketContext";
+import { respondToSession } from "@/services/sessionService";
+import SessionInvitationModal from "../SessionInvitationModal";
+import { useState, useEffect } from "react";
 
 export default function PatientDashboardLayout() {
-  const { profile } = useAuth();
+  const { profile, session: authSession } = useAuth();
+  const { subscribe } = useWebSocket();
   const navigate = useNavigate();
+  const token = authSession?.access_token;
+
+  const [invitation, setInvitation] = useState(null);
+  const [showInvitation, setShowInvitation] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribe("SESSION_REQUESTED", (data) => {
+      if (data.session) {
+        setInvitation(data.session);
+        setShowInvitation(true);
+      }
+    });
+    return () => unsub();
+  }, [subscribe]);
+
+  async function handleRespond(sessionId, action, reason) {
+    try {
+      await respondToSession(token, { sessionId, action, reason });
+      if (action === "accept") {
+        navigate(`/patient/session/${sessionId}`);
+      }
+    } catch (err) {
+      console.error("Failed to respond to session:", err);
+    }
+  }
 
   async function handleLogout() {
     await signOut();
@@ -49,6 +79,13 @@ export default function PatientDashboardLayout() {
           <Outlet />
         </div>
       </SidebarInset>
+
+      <SessionInvitationModal
+        open={showInvitation}
+        onOpenChange={setShowInvitation}
+        session={invitation}
+        onRespond={handleRespond}
+      />
     </SidebarProvider>
   );
 }

@@ -49,7 +49,7 @@ export default function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<MyHealthPage />} />
+        <Route path="dashboard" element={<PatientDashboard />} />
         <Route path="health" element={<MyHealthPage />} />
         <Route path="documents" element={<MyDocumentsPage />} />
         <Route index element={<Navigate to="dashboard" replace />} />

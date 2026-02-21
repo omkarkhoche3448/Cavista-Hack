@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const navItems = [
+  { title: "Dashboard", icon: LayoutDashboard, path: "/patient/dashboard" },
   { title: "My Health", icon: Heart, path: "/patient/health" },
   { title: "My Documents", icon: FileText, path: "/patient/documents" },
 ];
