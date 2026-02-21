@@ -1,18 +1,36 @@
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
+pydantic-settings
 google-genai
 requests
 Pillow
-pydantic
 python-dotenv
-pydantic-settings
-sqlalchemy
+sqlalchemy[asyncio]
+asyncpg
 psycopg2-binary
-pyjwt
+alembic
+pyjwt[crypto]
 bcrypt
-passlib
+passlib[argon2]
+python-multipart
 openai-whisper
 torch
 numpy
 soundfile
+# Real-time / async
+websockets
+redis[hiredis]
+celery[redis]
+# LLM clients
+openai
+anthropic
+# FHIR export
+fhirclient
+# Security
+cryptography
+pyotp
+# Testing
+pytest
+pytest-asyncio
+httpx
