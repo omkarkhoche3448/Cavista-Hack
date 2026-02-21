@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/features/auth";
+import { useWebSocket } from "@/context/WebSocketContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,7 +121,7 @@ const PatientEmailForm = ({ onBack, onStart }) => {
               <Button
                 type="submit"
                 disabled={!patientEmail.includes('@') || isLoading}
-                className="group relative px-10 py-4 rounded-full bg-primary text-white font-bold text-lg overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-primary/40 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90"
+                className="group relative px-10 py-4 rounded-full bg-primary text-primary-foreground font-bold text-lg overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-primary/40 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90"
               >
                 {/* Button shine effect */}
                 <div className="absolute inset-0 bg-white/10 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
@@ -182,9 +183,9 @@ const SessionCard = ({ session, onClick }) => (
       
       <div className="flex items-center justify-between">
         <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
-          session.status === 'completed' 
-            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+          session.status === 'completed'
+            ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+            : 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
         }`}>
           <CheckCircle className="w-3 h-3" />
           {session.status}
@@ -197,8 +198,9 @@ const SessionCard = ({ session, onClick }) => (
 
 export default function DoctorDashboard() {
   const { profile } = useAuth();
+  const { subscribe } = useWebSocket();
   const [showPatientForm, setShowPatientForm] = useState(false);
-  const [sessions] = useState([
+  const [sessions, setSessions] = useState([
     {
       id: 1,
       patientName: "Sarah Johnson",
@@ -373,7 +375,7 @@ export default function DoctorDashboard() {
                   
                   <Button 
                     onClick={handleStartSession}
-                    className="group/btn relative inline-flex items-center gap-3 px-12 py-5 text-xl font-bold rounded-full bg-primary text-white overflow-hidden transition-all duration-700 hover:shadow-2xl hover:shadow-primary/40 active:scale-95 transform hover:-translate-y-1 hover:bg-primary/90"
+                    className="group/btn relative inline-flex items-center gap-3 px-12 py-5 text-xl font-bold rounded-full bg-primary text-primary-foreground overflow-hidden transition-all duration-700 hover:shadow-2xl hover:shadow-primary/40 active:scale-95 transform hover:-translate-y-1 hover:bg-primary/90"
                   >
                     {/* Button effects */}
                     <div className="absolute inset-0 bg-primary-foreground/10 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500" />
@@ -414,7 +416,7 @@ export default function DoctorDashboard() {
         <Card className="group hover:shadow-lg hover:border-primary hover:-translate-y-1 transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Active Patients</CardTitle>
-            <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300">
               <Users className="w-4 h-4" />
             </div>
           </CardHeader>
@@ -429,7 +431,7 @@ export default function DoctorDashboard() {
         <Card className="group hover:shadow-lg hover:border-primary hover:-translate-y-1 transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Sessions Today</CardTitle>
-            <div className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 group-hover:scale-110 transition-transform duration-300">
+            <div className="p-2 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform duration-300">
               <Activity className="w-4 h-4" />
             </div>
           </CardHeader>
@@ -444,7 +446,7 @@ export default function DoctorDashboard() {
         <Card className="group hover:shadow-lg hover:border-primary hover:-translate-y-1 transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">EMR Generated</CardTitle>
-            <div className="p-2 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 group-hover:scale-110 transition-transform duration-300">
+            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-300">
               <FileBarChart className="w-4 h-4" />
             </div>
           </CardHeader>
