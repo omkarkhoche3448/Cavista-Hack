@@ -420,18 +420,23 @@ async def end_session(
             }).execute()
 
         # 2. Get document insights for context
-        insights_data = (
-            supabase.from_("pre_session_insights")
-            .select("summary, key_findings, medications_found, allergies_found")
-            .eq("session_id", body.session_id)
-            .execute()
-        )
+        try:
+            insights_data = (
+                supabase.from_("pre_session_insights")
+                .select("summary, key_findings, medications_found, allergies_found")
+                .eq("session_id", body.session_id)
+                .execute()
+            )
+            document_insights = insights_data.data if insights_data.data else None
+        except Exception as e:
+            logger.error(f"Failed to fetch pre-session insights: {e}")
+            document_insights = None
 
         # 3. Generate EMR draft
         emr_content = ai_service.generate_emr_draft(
             transcript=transcript or "No transcript available.",
             chief_complaint=session.data.get("chief_complaint", ""),
-            document_insights=insights_data.data if insights_data.data else None,
+            document_insights=document_insights,
         )
 
         emr_draft = supabase.table("emr_drafts").insert({
@@ -580,34 +585,39 @@ def get_session(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get a single session with full details."""
-    session = (
-        supabase.table("sessions")
-        .select(
-            "*, doctor:users!doctor_id(first_name, last_name, email), "
-            "patient:users!patient_id(first_name, last_name, email)"
+    try:
+        session = (
+            supabase.table("sessions")
+            .select(
+                "*, doctor:users!doctor_id(first_name, last_name, email), "
+                "patient:users!patient_id(first_name, last_name, email)"
+            )
+            .eq("id", session_id)
+            .single()
+            .execute()
         )
-        .eq("id", session_id)
-        .single()
-        .execute()
-    )
 
-    if not session.data:
-        raise HTTPException(status_code=404, detail="Session not found.")
+        if not session.data:
+            raise HTTPException(status_code=404, detail="Session not found.")
 
-    s = session.data
-    # Verify user has access
-    if current_user["id"] not in [s["doctor_id"], s["patient_id"]]:
-        raise HTTPException(status_code=403, detail="Access denied.")
+        s = session.data
+        # Verify user has access
+        if current_user["id"] not in [s["doctor_id"], s["patient_id"]]:
+            raise HTTPException(status_code=403, detail="Access denied.")
 
-    doc = s.pop("doctor", {}) or {}
-    pat = s.pop("patient", {}) or {}
-    s["doctor_name"] = f"Dr. {doc.get('first_name', '')} {doc.get('last_name', '')}".strip()
-    s["patient_name"] = f"{pat.get('first_name', '')} {pat.get('last_name', '')}".strip()
-    s["doctor_email"] = doc.get("email")
-    s["patient_email"] = pat.get("email")
+        doc = s.pop("doctor", {}) or {}
+        pat = s.pop("patient", {}) or {}
+        s["doctor_name"] = f"Dr. {doc.get('first_name', '')} {doc.get('last_name', '')}".strip()
+        s["patient_name"] = f"{pat.get('first_name', '')} {pat.get('last_name', '')}".strip()
+        s["doctor_email"] = doc.get("email")
+        s["patient_email"] = pat.get("email")
 
-    return s
+        return s
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database connection error.")
 
 
 @router.get("/{session_id}/transcript")
@@ -628,15 +638,19 @@ def get_transcript(
     if not session.data or current_user["id"] not in [session.data["doctor_id"], session.data["patient_id"]]:
         raise HTTPException(status_code=403, detail="Access denied.")
 
-    chunks = (
-        supabase.table("transcript_chunks")
-        .select("*")
-        .eq("session_id", session_id)
-        .order("chunk_index")
-        .execute()
-    )
+    try:
+        chunks = (
+            supabase.table("transcript_chunks")
+            .select("*")
+            .eq("session_id", session_id)
+            .order("chunk_index")
+            .execute()
+        )
 
-    return chunks.data or []
+        return chunks.data or []
+    except Exception as e:
+        logger.error(f"Error fetching transcript for {session_id}: {e}")
+        return []
 
 
 @router.get("/{session_id}/notifications")

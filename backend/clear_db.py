@@ -16,21 +16,14 @@ schema_map = {
         "session_document_shares", 
         "medical_documents", 
         "sessions", 
-        "integration_logs"
-    ],
-    "emr": [
+        "integration_logs",
         "icd_mappings",
         "treatment_suggestions",
         "patient_summaries",
         "emr_drafts",
         "final_emrs",
-        "export_logs"
-    ],
-    "ai": [
+        "export_logs",
         "pre_session_insights",
-        "jobs"
-    ],
-    "comms": [
         "ws_events",
         "ws_connections",
         "notifications"

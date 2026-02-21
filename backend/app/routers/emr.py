@@ -36,14 +36,18 @@ def get_emr_drafts(
     supabase: Client = Depends(get_supabase),
 ):
     """Get EMR drafts for a session."""
-    result = (
-        supabase.table("emr_drafts")
-        .select("*")
-        .eq("session_id", session_id)
-        .order("version", desc=True)
-        .execute()
-    )
-    return result.data or []
+    try:
+        result = (
+            supabase.table("emr_drafts")
+            .select("*")
+            .eq("session_id", session_id)
+            .order("version", desc=True)
+            .execute()
+        )
+        return result.data or []
+    except Exception as e:
+        logger.error(f"Failed to fetch EMR drafts: {e}")
+        return []
 
 
 @router.get("/draft/{draft_id}")
@@ -158,14 +162,18 @@ def get_icd_mappings(
     supabase: Client = Depends(get_supabase),
 ):
     """Get ICD code mappings for a session."""
-    result = (
-        supabase.table("icd_mappings")
-        .select("*")
-        .eq("session_id", session_id)
-        .order("is_primary", desc=True)
-        .execute()
-    )
-    return result.data or []
+    try:
+        result = (
+            supabase.table("icd_mappings")
+            .select("*")
+            .eq("session_id", session_id)
+            .order("is_primary", desc=True)
+            .execute()
+        )
+        return result.data or []
+    except Exception as e:
+        logger.error(f"Failed to fetch ICD mappings: {e}")
+        return []
 
 
 @router.patch("/icd-mappings/{mapping_id}")
@@ -195,14 +203,18 @@ def get_treatments(
     supabase: Client = Depends(get_supabase),
 ):
     """Get treatment suggestions for a session."""
-    result = (
-        supabase.table("treatment_suggestions")
-        .select("*")
-        .eq("session_id", session_id)
-        .order("created_at")
-        .execute()
-    )
-    return result.data or []
+    try:
+        result = (
+            supabase.table("treatment_suggestions")
+            .select("*")
+            .eq("session_id", session_id)
+            .order("created_at")
+            .execute()
+        )
+        return result.data or []
+    except Exception as e:
+        logger.error(f"Failed to fetch treatments: {e}")
+        return []
 
 
 @router.post("/treatments/approve")
@@ -333,14 +345,18 @@ def get_insights(
     supabase: Client = Depends(get_supabase),
 ):
     """Get AI-generated document insights for a session."""
-    result = (
-        supabase.from_("pre_session_insights")
-        .select("*")
-        .eq("session_id", session_id)
-        .order("created_at")
-        .execute()
-    )
-    return result.data or []
+    try:
+        result = (
+            supabase.from_("pre_session_insights")
+            .select("*")
+            .eq("session_id", session_id)
+            .order("created_at")
+            .execute()
+        )
+        return result.data or []
+    except Exception as e:
+        logger.error(f"Database error in get_insights: {e}")
+        return []
 
 
 # ─── Notifications ───

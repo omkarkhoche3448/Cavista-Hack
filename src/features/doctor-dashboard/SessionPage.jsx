@@ -21,6 +21,7 @@ import {
 import { getSession, endSession } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 
 export default function SessionPage() {
   const { sessionId } = useParams();
@@ -43,6 +44,13 @@ export default function SessionPage() {
   const chunkIndexRef = useRef(0);
   const sessionStartTimeRef = useRef(Date.now());
   const transcriptEndRef = useRef(null);
+
+  const {
+    startRecording: startAudioRecording,
+    pauseRecording: pauseAudioRecording,
+    stopRecording: stopAudioRecording,
+    saveRecording,
+  } = useAudioRecorder();
 
   // Fetch session data
   useEffect(() => {
@@ -176,7 +184,12 @@ export default function SessionPage() {
     recognition.start();
     recognitionRef.current = recognition;
     setIsRecording(true);
-  }, [send, sessionId]);
+
+    // Start audio recorder
+    startAudioRecording().catch(err => {
+      console.error("Failed to start audio recording:", err);
+    });
+  }, [send, sessionId, startAudioRecording]);
 
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false;
@@ -185,7 +198,10 @@ export default function SessionPage() {
       recognitionRef.current = null;
     }
     setIsRecording(false);
-  }, []);
+
+    // Pause audio recorder
+    pauseAudioRecording();
+  }, [pauseAudioRecording]);
 
   const requestAiInsight = useCallback(() => {
     send("REQUEST_AI_INSIGHT", { session_id: sessionId });
@@ -197,6 +213,12 @@ export default function SessionPage() {
     stopRecording();
 
     try {
+      // Stop and save audio recording
+      const audioResult = await stopAudioRecording();
+      if (audioResult?.blob) {
+        saveRecording(audioResult.blob, `session-${sessionId}`);
+      }
+
       await endSession(token, { sessionId, sessionNotes: "" });
       // Will navigate to review page when EMR_DRAFT_READY arrives
     } catch (err) {

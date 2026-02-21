@@ -239,16 +239,19 @@ async def share_documents(
             insight = ai_service.analyze_document(doc_text, doc.get("document_type", "medical record"))
 
             # Store insight
-            supabase.from_("pre_session_insights").insert({
-                "session_id": body.session_id,
-                "document_id": doc["id"],
-                "summary": insight.get("summary"),
-                "risk_flags": insight.get("risk_flags"),
-                "key_findings": insight.get("key_findings"),
-                "medications_found": insight.get("medications_found"),
-                "allergies_found": insight.get("allergies_found"),
-                "model_used": "gemini-2.0-flash",
-            }).execute()
+            try:
+                supabase.from_("pre_session_insights").insert({
+                    "session_id": body.session_id,
+                    "document_id": doc["id"],
+                    "summary": insight.get("summary"),
+                    "risk_flags": insight.get("risk_flags"),
+                    "key_findings": insight.get("key_findings"),
+                    "medications_found": insight.get("medications_found"),
+                    "allergies_found": insight.get("allergies_found"),
+                    "model_used": "gemini-2.0-flash",
+                }).execute()
+            except Exception as e:
+                logger.error(f"Failed to store pre-session insight for {doc['id']}: {e}")
 
             # Send insight to doctor
             await manager.send_to_user(doctor_id, "AI_INSIGHT_READY", {
@@ -280,13 +283,17 @@ def get_session_documents(
     if not session.data or current_user["id"] not in [session.data["doctor_id"], session.data["patient_id"]]:
         raise HTTPException(status_code=403, detail="Access denied.")
 
-    shares = (
-        supabase.table("session_document_shares")
-        .select("document_id, created_at, medical_documents(*)")
-        .eq("session_id", session_id)
-        .is_("revoked_at", "null")
-        .execute()
-    )
+    try:
+        shares = (
+            supabase.table("session_document_shares")
+            .select("document_id, created_at, medical_documents(*)")
+            .eq("session_id", session_id)
+            .is_("revoked_at", "null")
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Error fetching session documents for {session_id}: {e}")
+        return []
 
     docs = []
     for share in (shares.data or []):
