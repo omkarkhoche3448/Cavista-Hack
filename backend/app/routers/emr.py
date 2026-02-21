@@ -36,7 +36,20 @@ def get_emr_drafts(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get EMR drafts for a session."""
+    """
+    Retrieves all EMR drafts associated with a specific session, ordered by version.
+    
+    Why: Doctors need to see history of drafts or the latest pending draft for review.
+    Where: Called by the Doctor Dashboard -> EMR Review view.
+    
+    Args:
+        session_id (str): Session UUID.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        list: List of EMR draft records.
+    """
     try:
         result = (
             supabase.table("emr_drafts")
@@ -57,7 +70,20 @@ def get_emr_draft(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get a specific EMR draft with full details."""
+    """
+    Retrieves the full details of a specific EMR draft.
+    
+    Why: Used to load a specific draft version for editing or final approval.
+    Where: Called by the Frontend: Doctor Dashboard -> Draft Detail view.
+    
+    Args:
+        draft_id (str): Draft UUID.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        dict: The EMR draft record.
+    """
     result = (
         supabase.table("emr_drafts")
         .select("*")
@@ -76,7 +102,24 @@ async def approve_emr(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Doctor approves an EMR draft → creates final immutable EMR."""
+    """
+    Finalizes an EMR draft: applies final edits, updates status to 'approved', 
+    and generates an immutable final record with a cryptographic checksum.
+    
+    Why: Crucial for clinical record finalization, legal compliance (checksums), and session completion.
+    Where: Called by the Frontend: EMR Review -> Approve & Sign button.
+    
+    Args:
+        body (ApproveEMRRequest): draft_id, edits, and review notes.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        dict: Finalization status.
+        
+    Raises:
+        HTTPException: 404/403/400 on invalid requests.
+    """
     draft = (
         supabase.table("emr_drafts")
         .select("*")
@@ -162,7 +205,20 @@ def get_icd_mappings(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get ICD code mappings for a session."""
+    """
+    Retrieves the AI-suggested ICD-10 medical code mappings for a session.
+    
+    Why: Assists doctors in medical coding for billing and record-keeping standardization.
+    Where: Called by the Frontend: EMR Review -> Diagnosis/Codes section.
+    
+    Args:
+        session_id (str): Session UUID.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        list: List of diagnosis-to-code mapping records.
+    """
     try:
         result = (
             supabase.table("icd_mappings")
@@ -184,7 +240,21 @@ def update_icd_mapping(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Approve or reject an ICD mapping."""
+    """
+    Records the doctor's manual approval or rejection of an AI-suggested ICD mapping.
+    
+    Why: Ensures clinical oversight of AI-generated billing codes.
+    Where: Called by the Frontend: EMR Review -> Toggle code approval.
+    
+    Args:
+        mapping_id (str): Mapping record UUID.
+        action (str): 'approved' or 'rejected'.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        dict: The resulting status.
+    """
     now = datetime.now(timezone.utc).isoformat()
     supabase.table("icd_mappings").update({
         "approval_status": action,
@@ -203,7 +273,20 @@ def get_treatments(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get treatment suggestions for a session."""
+    """
+    Retrieves AI-suggested treatment plans for a session.
+    
+    Why: Provides clinical decision support to the doctor based on current guidelines.
+    Where: Called by the Frontend: EMR Review -> Treatments section.
+    
+    Args:
+        session_id (str): Session UUID.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        list: List of treatment suggestion records.
+    """
     try:
         result = (
             supabase.table("treatment_suggestions")
@@ -224,7 +307,20 @@ def approve_treatment(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Approve or reject a treatment suggestion."""
+    """
+    Approves or rejects an AI-generated treatment suggestion.
+    
+    Why: Allows doctors to curate the final treatment plan before it's finalized.
+    Where: Called by the Frontend: EMR Review -> Approve treatment.
+    
+    Args:
+        body (ApproveTreatmentRequest): suggestion_id, action, notes.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        dict: The resulting status.
+    """
     now = datetime.now(timezone.utc).isoformat()
     supabase.table("treatment_suggestions").update({
         "approval_status": body.action,
@@ -244,25 +340,51 @@ def get_patient_summary(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get patent summary for a session. Accessible by doctor (always) and patient (only when approved + sent)."""
+    """
+    Retrieves the patient-friendly summary for a session.
+    Doctors can always see it; patients only after approval and dispatch.
+    
+    Why: High-level summary of visit for patients to understand their care.
+    Where: Called by the Frontend: Doctor Dashboard -> Summary review, Patient Dashboard -> Visit Details.
+    
+    Args:
+        session_id (str): Session UUID.
+        current_user (dict): Injected authenticated user.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        dict: The summary record.
+        
+    Raises:
+        HTTPException: 403 on unauthorized access, 404 if not found or not yet available.
+    """
     # Verify session access
-    session = (
-        supabase.table("sessions")
-        .select("doctor_id, patient_id")
-        .eq("id", session_id)
-        .single()
-        .execute()
-    )
+    try:
+        session = (
+            supabase.table("sessions")
+            .select("doctor_id, patient_id")
+            .eq("id", session_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Error fetching session for summary check: {e}")
+        raise HTTPException(status_code=500, detail="Database error.")
+
     if not session.data or current_user["id"] not in [session.data["doctor_id"], session.data["patient_id"]]:
         raise HTTPException(status_code=403, detail="Access denied.")
 
-    result = (
-        supabase.table("patient_summaries")
-        .select("*")
-        .eq("session_id", session_id)
-        .single()
-        .execute()
-    )
+    try:
+        result = (
+            supabase.table("patient_summaries")
+            .select("*")
+            .eq("session_id", session_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        logger.warning(f"Could not fetch patient summary (table may be missing or RLS denied): {e}")
+        raise HTTPException(status_code=404, detail="Summary not found.")
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Summary not found.")
@@ -281,7 +403,20 @@ async def approve_patient_summary(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Approve and send patient summary."""
+    """
+    Approves the patient summary, applies doctor edits, and dispatches a notification to the patient.
+    
+    Why: Final step in closing the feedback loop with the patient.
+    Where: Called by the Frontend: EMR Review -> Share with Patient button.
+    
+    Args:
+        body (ApproveSummaryRequest): summary_id and optional edits.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        dict: Finalization status.
+    """
     summary = (
         supabase.table("patient_summaries")
         .select("*, sessions!patient_summaries_session_id_fkey(patient_id)")
@@ -346,7 +481,20 @@ def get_insights(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get AI-generated document insights for a session."""
+    """
+    Retrieves AI-generated insights from documents shared BEFORE the session started.
+    
+    Why: Gives the doctor immediate clinical context before entering the room.
+    Where: Called by the Frontend: Session Room -> Pre-session insights sidebar.
+    
+    Args:
+        session_id (str): Session UUID.
+        current_user (dict): Injected authenticated doctor.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        list: List of insight records.
+    """
     try:
         result = (
             supabase.table("pre_session_insights")
@@ -368,7 +516,19 @@ def get_notifications(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get all notifications for the current user."""
+    """
+    Fetches the 50 most recent notifications for the authenticated user.
+    
+    Why: Keeps users updated on session requests, shared files, and approved summaries.
+    Where: Called by the Frontend: Shared -> Notification bell/dropdown.
+    
+    Args:
+        current_user (dict): Injected authenticated user.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        list: List of notification records.
+    """
     result = (
         supabase.table("notifications")
         .select("*")
@@ -386,7 +546,20 @@ def mark_notification_read(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Mark a notification as read."""
+    """
+    Marks a specific notification as read.
+    
+    Why: UX hygiene — clears indicators once the user has seen the update.
+    Where: Called by the Frontend when clicking a notification.
+    
+    Args:
+        notification_id (str): Notification UUID.
+        current_user (dict): Injected authenticated user.
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        dict: Success status.
+    """
     now = datetime.now(timezone.utc).isoformat()
     supabase.table("notifications").update({
         "is_read": True,

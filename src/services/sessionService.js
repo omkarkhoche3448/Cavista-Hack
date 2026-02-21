@@ -89,3 +89,26 @@ export async function uploadRecording(token, sessionId, blob) {
   }
   return res.json();
 }
+
+/**
+ * Transcribes session audio using the dual S3 + Analysis API flow.
+ */
+export async function transcribeAudio(token, sessionId, blob) {
+  const formData = new FormData();
+  formData.append("file", blob, `session-${sessionId}.webm`);
+  formData.append("session_id", sessionId);
+
+  const res = await fetch(`${SESSIONS_API}/transcribe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Transcription upload failed");
+  }
+  return res.json();
+}

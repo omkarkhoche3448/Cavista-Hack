@@ -15,5 +15,14 @@ supabase: Client = create_client(
 
 
 def get_supabase() -> Client:
-    """FastAPI dependency for Supabase client access."""
+    """
+    FastAPI dependency that provides the initialized Supabase client singleton.
+    
+    Called by:
+        - Virtually all routers (auth.py, sessions.py, documents.py, emr.py) as a Depends() dependency.
+        - Internal handle_ws_event utility in sessions.py.
+        
+    Returns:
+        supabase.Client: The shared Supabase client instance.
+    """
     return supabase

@@ -1,20 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
-from supabase import Client
-import logging
-
-from .config import settings
-from .db import get_supabase
-
-security = HTTPBearer()
-logger = logging.getLogger(__name__)
-
-
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError, jwk
-from jose.utils import base64url_decode
 from supabase import Client
 import logging
 import requests
@@ -25,12 +11,19 @@ from .db import get_supabase
 security = HTTPBearer()
 logger = logging.getLogger(__name__)
 
-# Cache the JWKS public key for ES256 verification
 _jwks_cache: dict | None = None
 
 
 def _get_jwks() -> dict:
-    """Fetch and cache the Supabase JWKS public keys."""
+    """
+    Fetches and caches the JSON Web Key Set (JWKS) from Supabase.
+    
+    Why: Required to verify JWT tokens signed by Supabase Auth using RSA.
+    Where: Internal utility used by `get_current_user` for token verification.
+    
+    Returns:
+        dict: The JWKS dictionary containing public keys.
+    """
     global _jwks_cache
     if _jwks_cache is not None:
         return _jwks_cache
@@ -43,7 +36,18 @@ def _get_jwks() -> dict:
 
 
 def _get_signing_key(token: str):
-    """Find the matching JWKS key for the token's kid."""
+    """
+    Extracts the correct signing key from JWKS for a specific JWT.
+    
+    Why: A token's 'kid' (Key ID) header tells us which public key was used to sign it.
+    Where: Used by `get_current_user` during token verification.
+    
+    Args:
+        token (str): The raw JWT string.
+        
+    Returns:
+        jwk.JWK: The constructed signing key if found, else None.
+    """
     jwks = _get_jwks()
     header = jwt.get_unverified_header(token)
     kid = header.get("kid")
@@ -57,7 +61,22 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     supabase: Client = Depends(get_supabase),
 ) -> dict:
-    """Verify Supabase JWT and return user data from public.users."""
+    """
+    FastAPI dependency to authenticate users via Supabase JWT.
+    
+    Why: Protects routes by ensuring the requester is logged in and has a valid session.
+    Where: Used as a dependency in almost all protected API endpoints.
+    
+    Args:
+        credentials (HTTPAuthorizationCredentials): Bearer token from the Auth header.
+        supabase (Client): Supabase client for secondary profile lookup.
+        
+    Returns:
+        dict: The user's profile record from the 'users' table.
+        
+    Raises:
+        HTTPException: 401 if token invalid/expired, 404 if profile missing.
+    """
     token = credentials.credentials
 
     credentials_exception = HTTPException(
@@ -67,12 +86,10 @@ async def get_current_user(
     )
 
     try:
-        # Check token header to decide verification strategy
         header = jwt.get_unverified_header(token)
         alg = header.get("alg", "HS256")
 
         if alg == "HS256":
-            # Legacy: signed with JWT secret
             payload = jwt.decode(
                 token,
                 settings.SUPABASE_JWT_SECRET,
@@ -80,7 +97,6 @@ async def get_current_user(
                 audience="authenticated",
             )
         else:
-            # ES256 / asymmetric: verify with JWKS public key
             signing_key = _get_signing_key(token)
             if signing_key is None:
                 logger.error("No matching JWKS key found for kid=%s", header.get("kid"))
@@ -117,7 +133,18 @@ async def get_current_user(
 
 
 def require_role(required_role: str):
-    """Dependency factory that checks if user has the required role."""
+    """
+    Higher-order dependency for Role-Based Access Control (RBAC).
+    
+    Why: Restricts access to specific endpoints based on user role (e.g., 'doctor' only).
+    Where: Used in routers where specific actions are role-protected (e.g., creating clinical sessions).
+    
+    Args:
+        required_role (str): The role string required (e.g., "doctor", "patient").
+        
+    Returns:
+        function: A dependency function for use with FastAPI `Depends()`.
+    """
     async def role_checker(
         current_user: dict = Depends(get_current_user),
     ) -> dict:

@@ -19,7 +19,7 @@ import {
   Stethoscope,
   Activity,
 } from "lucide-react";
-import { getSession, endSession, uploadRecording } from "@/services/sessionService";
+import { getSession, endSession, transcribeAudio } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
@@ -233,7 +233,7 @@ export default function SessionPage() {
       const audioResult = await stopAudioRecording();
       if (audioResult?.blob) {
         try {
-          await uploadRecording(token, sessionId, audioResult.blob);
+          await transcribeAudio(token, sessionId, audioResult.blob);
           console.log("Recording saved to s3 folder successfully");
         } catch (uploadErr) {
           console.error("Failed to upload recording to s3:", uploadErr);

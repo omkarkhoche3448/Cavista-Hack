@@ -28,4 +28,13 @@ app.include_router(emr.router)
 
 @app.get("/")
 def read_root():
+    """
+    Root endpoint for service discovery and health check.
+    
+    Why: Used to verify if the API is running and accessible.
+    Where: Called by infrastructure health checks or manual verification.
+    
+    Returns:
+        dict: API version and description.
+    """
     return {"Version": "1.0.0", "Description": "SEVAमित्र API"}

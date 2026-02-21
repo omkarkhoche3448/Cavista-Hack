@@ -1,64 +1,188 @@
+"""
+AI Service — all calls to the external Analysis AI API go through here.
+"""
+
 import logging
 import requests
-import json
 from ..config import settings
 
 logger = logging.getLogger(__name__)
-
-# The External API URL from your settings
 BASE_URL = settings.ANALYSIS_API_URL
 
-def _call_external_api(endpoint: str, payload: dict):
-    """Generic wrapper for calling the external analysis service."""
+
+def _call(endpoint: str, payload: dict):
+    """
+    Internal generic POST wrapper for the external Analysis AI service.
+    
+    Why: Provides a single point of failure handling, logging, and timeout management for all AI calls.
+    Where: Used by all public functions in `ai_service.py`.
+    
+    Args:
+        endpoint (str): The API path (e.g., '/ai/generate-emr').
+        payload (dict): JSON-serializable dictionary.
+        
+    Returns:
+        dict | list | None: Parsed JSON response if 200 OK, else None.
+    """
     try:
         url = f"{BASE_URL}{endpoint}"
-        logger.info(f"Calling external AI: {url}")
-        
+        logger.info(f"External AI POST: {url}")
         resp = requests.post(url, json=payload, timeout=90)
         if resp.status_code == 200:
             return resp.json()
+        elif resp.status_code == 404:
+            logger.warning(f"External AI 404: {url} — skipping.")
+            return None
         else:
             logger.error(f"External AI Error ({resp.status_code}): {resp.text}")
             return None
     except Exception as e:
-        logger.error(f"Failed to connect to external AI: {e}")
+        logger.error(f"External AI connection failed: {e}")
         return None
 
-def generate_emr_draft(transcript: str, chief_complaint: str, document_insights=None):
-    """Calls external API to generate a full EMR draft."""
+
+def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_url: str = None) -> dict:
+    """
+    Requests the external AI to generate a structured EMR draft from session data.
+    
+    Why: Automates clinical documentation, saving significant time for doctors.
+    Where: Called by the `run_ai_pipeline` background task in `sessions.py`.
+    
+    Args:
+        chief_complaint (str): The patient's primary complaint.
+        document_insights (list, optional): Summaries of shared medical documents.
+        audio_url (str, optional): Link to the session recording.
+        
+    Returns:
+        dict: A structured EMR object with HPI, Assessment, Plan, etc.
+    """
     payload = {
-        "transcript": transcript,
+        "conversation": audio_url or "",
         "chief_complaint": chief_complaint,
-        "document_insights": document_insights
+        "report_summaries": document_insights or [],
     }
-    result = _call_external_api("/ai/generate-emr", payload)
-    return result or {}
+    result = _call("/ai/generate-emr", payload)
+    return result or {
+        "chief_complaint": chief_complaint,
+        "history_present_illness": "Pending AI processing.",
+        "assessment": "Pending AI processing.",
+        "diagnoses": [],
+        "treatment_plan": "Pending AI processing.",
+    }
 
-def map_icd_codes(diagnoses: list, transcript: str = ""):
-    """Calls external API for ICD-10 mapping."""
-    payload = {
-        "diagnoses": diagnoses,
-        "transcript": transcript
-    }
-    result = _call_external_api("/ai/map-icd", payload)
+
+def map_icd_codes(diagnoses: list, audio_url: str = None) -> list:
+    """
+    Suggests ICD-10 medical codes for a list of clinical diagnoses.
+    
+    Why: Essential for standardized medical billing and record classification.
+    Where: Called by the `run_ai_pipeline` background task.
+    
+    Args:
+        diagnoses (list): String list of clinical diagnoses.
+        audio_url (str, optional): Context from the recording for higher accuracy.
+        
+    Returns:
+        list: List of mapping objects (text, code, description, confidence).
+    """
+    if not diagnoses:
+        return []
+    result = _call("/ai/map-icd", {"diagnoses": diagnoses, "conversation": audio_url})
     return result or []
 
-def suggest_treatments(diagnoses: list, patient_context: str = "", current_medications=None):
-    """Calls external API for treatment suggestions."""
-    payload = {
+
+def suggest_treatments(diagnoses: list, current_medications=None, audio_url: str = None) -> list:
+    """
+    Generates evidence-based treatment suggestions based on diagnoses.
+    
+    Why: Provides clinical decision support to improve patient outcomes and safety.
+    Where: Called by the `run_ai_pipeline` background task.
+    
+    Args:
+        diagnoses (list): List of patient diagnoses.
+        current_medications (list, optional): Patient's existing meds to check for interactions.
+        audio_url (str, optional): Clinical context from recording.
+        
+    Returns:
+        list: Suggested treatments with priority and rationale.
+    """
+    if not diagnoses:
+        return []
+    result = _call("/ai/suggest-treatments", {
         "diagnoses": diagnoses,
-        "patient_context": patient_context,
-        "current_medications": current_medications
-    }
-    result = _call_external_api("/ai/suggest-treatments", payload)
+        "conversation": audio_url,
+        "current_medications": current_medications,
+    })
     return result or []
 
-def generate_patient_summary(emr_content: dict, diagnoses: list, treatments: list):
-    """Calls external API for patient-friendly summary."""
-    payload = {
+
+def generate_patient_summary(emr_content: dict, diagnoses: list, treatments: list) -> dict:
+    """
+    Translates complex clinical notes into a patient-friendly summary.
+    
+    Why: Improves patient health literacy and adherence to the care plan.
+    Where: Called by the `run_ai_pipeline` background task.
+    
+    Args:
+        emr_content (dict): The full EMR draft.
+        diagnoses (list): Final diagnoses.
+        treatments (list): Suggested treatments.
+        
+    Returns:
+        dict: Summary with key takeaways, warnings, and follow-up notes.
+    """
+    result = _call("/ai/generate-summary", {
         "emr_content": emr_content,
         "diagnoses": diagnoses,
-        "treatments": treatments
+        "treatments": treatments,
+    })
+    return result or {
+        "summary_text": "Your session summary is being processed. Please check back later.",
+        "key_takeaways": [],
+        "medications_list": [],
+        "follow_up_notes": "Consult your doctor for details.",
+        "warnings": [],
     }
-    result = _call_external_api("/ai/generate-summary", payload)
-    return result or {}
+
+
+def generate_live_insight(transcript: str) -> str:
+    """
+    Analyzes live transcript text to provide real-time clinical hints.
+    
+    Why: Assists doctors DURING the session with potential red flags or missed questions.
+    Where: Called by the WebSocket handler in `sessions.py` when requested.
+    
+    Args:
+        transcript (str): Current window of the session conversation.
+        
+    Returns:
+        str: A short, actionable clinical insight.
+    """
+    result = _call("/ai/live-insight", {"transcript": transcript})
+    if result:
+        return result.get("insight", "No insight generated.")
+    return "Live insights are not available right now."
+
+
+def analyze_lab_report(pdf_url: str, patient_id: str, patient_name: str, report_type: str) -> dict | None:
+    """
+    Performs OCR and clinical extraction on a uploaded lab report or document.
+    
+    Why: Converts raw images/PDFs into structured medical data for the doctor's review.
+    Where: Called by the `upload_document` endpoint in `documents.py`.
+    
+    Args:
+        pdf_url (str): Presigned S3 URL of the file.
+        patient_id (str): UUID of the patient.
+        patient_name (str): Full name for context.
+        report_type (str): Hint for extraction logic.
+        
+    Returns:
+        dict: Extracted key findings, risk flags, and summaries.
+    """
+    return _call("/ai/analyze-lab-report", {
+        "pdf_url": pdf_url,
+        "patient_id": patient_id,
+        "patient_name": patient_name,
+        "report_type": report_type,
+    })

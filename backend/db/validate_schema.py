@@ -32,6 +32,18 @@ EXPECTED_EXTENSIONS = ["uuid-ossp", "pgcrypto", "pg_trgm", "btree_gist", "unacce
 
 
 def validate(dsn: str) -> bool:
+    """
+    Validates that the target PostgreSQL database has the correct extensions, tables, and indexes.
+    
+    Why: Ensures the environment is correctly provisioned before running the application.
+    Where: Manual execution via terminal or as part of a CI/CD deployment pipeline.
+    
+    Args:
+        dsn (str): PostgreSQL Data Source Name (connection string).
+        
+    Returns:
+        bool: True if all schema requirements are met.
+    """
     try:
         import psycopg2
     except ImportError:

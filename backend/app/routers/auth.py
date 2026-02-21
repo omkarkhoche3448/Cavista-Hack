@@ -19,7 +19,22 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/signup", response_model=AuthResponse)
 def signup(body: SignupRequest, supabase: Client = Depends(get_supabase)):
-    """Register a new user via Supabase Auth."""
+    """
+    Registers a new user via Supabase Auth and creates a profile in the 'users' table.
+    
+    Why: Fundamental entry point for new users to access the platform.
+    Where: Called by the Signup page in the Frontend.
+    
+    Args:
+        body (SignupRequest): User registration details (email, password, first_name, last_name, role).
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        AuthResponse: Access token and basic user info.
+        
+    Raises:
+        HTTPException: 400 if registration fails or user already exists.
+    """
     try:
         res = supabase.auth.sign_up(
             {
@@ -63,7 +78,22 @@ def signup(body: SignupRequest, supabase: Client = Depends(get_supabase)):
 
 @router.post("/login", response_model=AuthResponse)
 def login(body: LoginRequest, supabase: Client = Depends(get_supabase)):
-    """Sign in with email and password."""
+    """
+    Authenticates a user with email and password via Supabase Auth.
+    
+    Why: Handles secure user entry and provides the JWT required for all subsequent API calls.
+    Where: Called by the Login page in the Frontend.
+    
+    Args:
+        body (LoginRequest): Credentials (email, password).
+        supabase (Client): Injected Supabase client.
+        
+    Returns:
+        AuthResponse: Access token and profile data.
+        
+    Raises:
+        HTTPException: 401 if credentials invalid, 404 if profile missing.
+    """
     try:
         res = supabase.auth.sign_in_with_password(
             {"email": body.email, "password": body.password}
@@ -106,7 +136,18 @@ def login(body: LoginRequest, supabase: Client = Depends(get_supabase)):
 
 @router.get("/me", response_model=UserResponse)
 def get_profile(current_user: dict = Depends(get_current_user)):
-    """Get the authenticated user's profile."""
+    """
+    Returns the authenticated user's current profile from the 'users' table.
+    
+    Why: Allows the frontend to display user details and check current status.
+    Where: Called on every page load (via AuthProvider) and on the Profile page.
+    
+    Args:
+        current_user (dict): User profile injected via JWT dependency.
+        
+    Returns:
+        dict: The user's record.
+    """
     return current_user
 
 
@@ -116,7 +157,23 @@ def update_profile(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Update the authenticated user's profile fields."""
+    """
+    Updates specific fields of the authenticated user's profile.
+    
+    Why: Essential for user self-service and data accuracy (phone, birthday, etc.).
+    Where: Called by the Profile Settings page in the Frontend.
+    
+    Args:
+        body (ProfileUpdateRequest): Fields to update.
+        current_user (dict): User profile injected via JWT dependency.
+        supabase (Client): Supabase client.
+        
+    Returns:
+        dict: The updated user record.
+        
+    Raises:
+        HTTPException: 400 if no fields provided, 500 if DB update fails.
+    """
     updates = body.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(
@@ -150,7 +207,23 @@ def create_doctor_profile(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Create a doctor profile for the authenticated doctor."""
+    """
+    Creates a detailed doctor profile (specialization, hospital, etc.).
+    
+    Why: Doctors need a specialized profile beyond basic user data for clinical workflows.
+    Where: Called during doctor onboarding or first-time setup.
+    
+    Args:
+        body (DoctorProfileCreate): Specialization, hospital info.
+        current_user (dict): Injected via role-based dependency.
+        supabase (Client): Supabase client.
+        
+    Returns:
+        dict: The created doctor profile object.
+        
+    Raises:
+        HTTPException: 409 if profile already exists, 500 on failure.
+    """
     # Check if profile already exists
     existing = (
         supabase.table("doctor_profiles")
@@ -184,7 +257,22 @@ def get_doctor_profile(
     current_user: dict = Depends(require_role("doctor")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get the authenticated doctor's profile."""
+    """
+    Retrieves the doctor-specific profile data for the logged-in doctor.
+    
+    Why: Required to populate the doctor dashboard and profile settings.
+    Where: Called by the Doctor Dashboard and Profile page.
+    
+    Args:
+        current_user (dict): Injected via role-based dependency.
+        supabase (Client): Supabase client.
+        
+    Returns:
+        dict: The doctor's profile.
+        
+    Raises:
+        HTTPException: 404 if profile hasn't been created yet.
+    """
     result = (
         supabase.table("doctor_profiles")
         .select("*")
@@ -207,7 +295,22 @@ def get_patient_profile(
     current_user: dict = Depends(require_role("patient")),
     supabase: Client = Depends(get_supabase),
 ):
-    """Get the authenticated patient's profile."""
+    """
+    Retrieves the patient-specific profile data for the logged-in patient.
+    
+    Why: Required for medical context (blood type, MRN, etc.) in the patient dashboard.
+    Where: Called by the Patient Dashboard and Profile page.
+    
+    Args:
+        current_user (dict): Injected via role-based dependency.
+        supabase (Client): Supabase client.
+        
+    Returns:
+        dict: The patient's profile.
+        
+    Raises:
+        HTTPException: 404 if patient record is missing.
+    """
     result = (
         supabase.table("patient_profiles")
         .select("*")

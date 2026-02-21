@@ -31,6 +31,15 @@ schema_map = {
 }
 
 def clear_tables():
+    """
+    Utility script to wipe all application data from the Supabase database.
+    
+    Why: Used by developers to reset the environment to a clean state during testing or hackathon iterations.
+    Where: Manual execution from the terminal (python clear_db.py).
+    
+    Processing: Iterates through defined schemas and tables, using a 'neq' filter on ID to bypass 
+    Supabase's restriction on DELETE without a WHERE clause in some configurations.
+    """
     print("Starting database cleanup...")
     
     for schema, tables in schema_map.items():
