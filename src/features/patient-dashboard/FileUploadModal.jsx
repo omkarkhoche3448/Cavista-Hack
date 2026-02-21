@@ -82,7 +82,7 @@ export default function FileUploadModal({ open, onOpenChange, onUploaded }) {
               id="doc-type"
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex h-10 w-full rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {DOC_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>

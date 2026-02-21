@@ -174,7 +174,7 @@ export default function PatientDashboard() {
           <p className="text-muted-foreground mt-1 flex items-center gap-2">
             Your health overview
             {isConnected ? (
-              <span className="flex items-center gap-1 text-xs text-green-600">
+              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                 <Wifi className="w-3 h-3" /> Live
               </span>
             ) : (
