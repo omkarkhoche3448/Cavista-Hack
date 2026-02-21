@@ -11,6 +11,8 @@ from jose import jwt, JWTError
 from supabase import Client
 import requests
 import uuid
+import traceback
+from postgrest.exceptions import APIError
 
 from ..db import get_supabase
 from ..oauth2 import get_current_user, require_role, _get_signing_key
@@ -425,6 +427,10 @@ async def end_session(
             .single()
             .execute()
         )
+    except APIError as e:
+        if e.code == "PGRST116":  # No rows found
+            raise HTTPException(status_code=404, detail="Session not found.")
+        raise e
     except Exception:
         raise HTTPException(status_code=404, detail="Session not found.")
 
@@ -884,7 +890,7 @@ def get_patient_detail(
 
 
 @router.get("/{session_id}")
-def get_session(
+async def get_session(
     session_id: str,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
@@ -902,16 +908,29 @@ def get_session(
         dict: Detailed session record with joined doctor/patient details.
     """
     try:
-        session = (
-            supabase.table("sessions")
-            .select("*, doctor:users!doctor_id(first_name, last_name, email), patient:users!patient_id(first_name, last_name, email, gender, date_of_birth)")
-            .eq("id", session_id)
-            .single()
-            .execute()
-        )
-        if not session.data:
-            raise HTTPException(status_code=404, detail="Session not found.")
+        # Retry once on "Server disconnected"
+        for attempt in range(2):
+            try:
+                session = (
+                    supabase.table("sessions")
+                    .select("*, doctor:users!doctor_id(first_name, last_name, email), patient:users!patient_id(first_name, last_name, email, gender, date_of_birth)")
+                    .eq("id", session_id)
+                    .single()
+                    .execute()
+                )
+                break
+            except APIError as e:
+                if e.code == "PGRST116":  # No rows found
+                    raise HTTPException(status_code=404, detail="Session not found.")
+                raise e # Re-raise other API errors
+            except Exception as e:
+                if "Server disconnected" in str(e) and attempt == 0:
+                    logger.warning(f"Supabase disconnected for session {session_id}, retrying...")
+                    await asyncio.sleep(0.5)
+                    continue
+                raise e
 
+        # ... (rest of processing)
         s = session.data
         if current_user["id"] not in [s["doctor_id"], s["patient_id"]]:
             raise HTTPException(status_code=403, detail="Access denied.")
@@ -927,6 +946,11 @@ def get_session(
         return s
     except HTTPException:
         raise
+    except APIError as e:
+        if e.code == "PGRST116":
+            raise HTTPException(status_code=404, detail="Session not found.")
+        logger.error(f"Postgrest error fetching session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database integrity error.")
     except Exception as e:
         logger.error(f"Error fetching session {session_id}: {e}")
         raise HTTPException(status_code=500, detail="Database connection error.")
@@ -1059,8 +1083,25 @@ async def run_audio_transcription(session_id: str, recording_url: str, uploaded_
 
         else:
             logger.error(f"External Transcribe API Error ({response.status_code}): {response.text}")
+            # FALLBACK: Trigger AI pipeline anyway, so at least reports and manual chunks are processed
+            print(f"[TRANSCRIPTION-BG] Transcription failed for {session_id}. Running AI pipeline as fallback.")
+            supabase = get_supabase()
+            sess_data = supabase.table("sessions").select("chief_complaint, ended_at").eq("id", session_id).single().execute()
+            chief_complaint = sess_data.data.get("chief_complaint", "") if sess_data.data else ""
+            ended_at = sess_data.data.get("ended_at", "") if sess_data.data else ""
+            await run_ai_pipeline(session_id, user_id, chief_complaint, ended_at)
+
     except Exception as e:
         logger.error(f"Background transcription failed for {session_id}: {e}")
+        # FINAL FALLBACK: Ensure the pipeline runs even if the transcription code crashed
+        try:
+            supabase = get_supabase()
+            sess_data = supabase.table("sessions").select("chief_complaint, ended_at").eq("id", session_id).single().execute()
+            chief_complaint = sess_data.data.get("chief_complaint", "") if sess_data.data else ""
+            ended_at = sess_data.data.get("ended_at", "") if sess_data.data else ""
+            await run_ai_pipeline(session_id, user_id, chief_complaint, ended_at)
+        except Exception as final_e:
+            logger.error(f"Critical failure: Could not even trigger fallback AI pipeline for {session_id}: {final_e}")
 
 
 
