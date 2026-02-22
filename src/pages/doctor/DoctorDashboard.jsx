@@ -576,17 +576,25 @@ export default function DoctorDashboard() {
                         {/* Floating doc icons */}
                         <g opacity="0.35">
                           <rect x="60" y="280" width="28" height="34" rx="4" fill="hsl(200, 45%, 10%)" stroke="hsl(168, 65%, 45%)" strokeWidth="1" />
-                          <rect x="66" y="290" width="16" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.6" />
-                          <rect x="66" y="295" width="12" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.4" />
-                          <rect x="66" y="300" width="14" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.3" />
+                          {/* PDF header band */}
+                          <rect x="60" y="280" width="28" height="11" rx="4" fill="hsl(0, 75%, 55%)" opacity="0.9" />
+                          <rect x="60" y="286" width="28" height="5" fill="hsl(0, 75%, 55%)" opacity="0.9" />
+                          <text x="74" y="290" textAnchor="middle" fill="white" fontSize="5" fontWeight="700" fontFamily="sans-serif">PDF</text>
+                          <rect x="65" y="297" width="18" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.6" />
+                          <rect x="65" y="302" width="13" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.4" />
+                          <rect x="65" y="307" width="16" height="2" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.3" />
                           <animate attributeName="transform" values="translate(0,0);translate(0,-6);translate(0,0)" dur="4s" repeatCount="indefinite" />
                         </g>
 
                         <g opacity="0.3">
                           <rect x="385" y="270" width="28" height="34" rx="4" fill="hsl(200, 45%, 10%)" stroke="hsl(36, 85%, 55%)" strokeWidth="1" />
-                          <rect x="391" y="280" width="16" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.6" />
-                          <rect x="391" y="285" width="12" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.4" />
-                          <rect x="391" y="290" width="14" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.3" />
+                          {/* PDF header band */}
+                          <rect x="385" y="270" width="28" height="11" rx="4" fill="hsl(0, 75%, 55%)" opacity="0.9" />
+                          <rect x="385" y="276" width="28" height="5" fill="hsl(0, 75%, 55%)" opacity="0.9" />
+                          <text x="399" y="280" textAnchor="middle" fill="white" fontSize="5" fontWeight="700" fontFamily="sans-serif">PDF</text>
+                          <rect x="390" y="287" width="18" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.6" />
+                          <rect x="390" y="292" width="13" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.4" />
+                          <rect x="390" y="297" width="16" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.3" />
                           <animate attributeName="transform" values="translate(0,0);translate(0,-6);translate(0,0)" dur="4s" begin="1s" repeatCount="indefinite" />
                         </g>
 

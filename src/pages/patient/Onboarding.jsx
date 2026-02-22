@@ -259,7 +259,7 @@ export default function Onboarding() {
                                     </div>
 
                                     <div className="flex justify-between items-center pt-4">
-                                        <Button type="button" variant="ghost" onClick={nextStep} className="h-11 px-6 rounded-xl font-bold text-slate-400 hover:text-slate-600">
+                                        <Button type="button" variant="ghost" onClick={nextStep} className="h-11 px-6 rounded-xl font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-500 dark:hover:bg-slate-800">
                                             Skip for now
                                         </Button>
                                         <Button type="button" onClick={nextStep} className="h-11 px-8 rounded-xl font-bold gap-2">
@@ -502,9 +502,7 @@ export default function Onboarding() {
                 </Card>
 
                 {/* Support Link */}
-                <p className="mt-8 text-center text-slate-400 text-sm">
-                    Need help? <button className="text-primary font-bold hover:underline">Contact Cavista Support</button>
-                </p>
+                <p className="mt-8 text-center text-slate-400 text-sm">                </p>
             </div>
         </div>
     );

@@ -70,6 +70,7 @@ export default function IndividualPatient() {
             (s) => s.patient_id === patientId
           )
         );
+        setError(null);
       } else {
         setError(sessionsResult.reason?.message || "Failed to load sessions");
       }
@@ -155,7 +156,7 @@ export default function IndividualPatient() {
                   <InfoTag icon={Ruler} label="Height" value={`${patient.height_cm} cm`} color="bg-green-50 text-green-700" />
                 )}
                 {patient?.weight_kg && (
-                  <InfoTag icon={Weight} label="Weight" value={`${patient.weight_kg} kg`} color="bg-orange-50 text-orange-700" />
+                  <InfoTag icon={Weight} label="Weight" value={`${patient.weight_kg} kg`} color="bg-gray-50 text-gray-600" />
                 )}
                 {patient?.mrn && (
                   <InfoTag icon={FileText} label="MRN" value={patient.mrn} color="bg-purple-50 text-purple-700" />
