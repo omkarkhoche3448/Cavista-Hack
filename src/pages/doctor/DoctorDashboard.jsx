@@ -521,46 +521,18 @@ export default function DoctorDashboard() {
                         <rect x="220" y="230" width="40" height="20" rx="2" fill="hsl(200, 30%, 18%)" />
                         <rect x="200" y="248" width="80" height="6" rx="3" fill="hsl(200, 30%, 18%)" />
 
-                        {/* PDF Summarization on screen */}
+                        {/* Waveform on screen */}
+                        <path d="M170 155 L185 155 L192 135 L200 170 L208 125 L216 175 L224 140 L232 165 L240 130 L248 170 L256 145 L264 160 L272 150 L280 155 L295 155" stroke="hsl(168, 65%, 45%)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.9">
+                          <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+                        </path>
 
-                        {/* Doc page icon — top left of screen */}
-                        <rect x="165" y="113" width="16" height="20" rx="2" fill="hsl(200, 45%, 8%)" stroke="hsl(168, 65%, 45%)" strokeWidth="1.2" opacity="0.9" />
-                        {/* Folded corner */}
-                        <path d="M176 113 L181 118 L176 118 Z" fill="hsl(168, 65%, 45%)" opacity="0.45" />
-                        {/* Lines inside doc icon */}
-                        <rect x="168" y="121" width="10" height="1.5" rx="0.75" fill="hsl(168, 65%, 45%)" opacity="0.4" />
-                        <rect x="168" y="124" width="7" height="1.5" rx="0.75" fill="hsl(168, 65%, 45%)" opacity="0.3" />
-                        <rect x="168" y="127" width="9" height="1.5" rx="0.75" fill="hsl(168, 65%, 45%)" opacity="0.3" />
-
-                        {/* Summary title bar next to icon */}
-                        <rect x="186" y="116" width="55" height="5" rx="2.5" fill="hsl(168, 65%, 45%)" opacity="0.65">
-                          <animate attributeName="opacity" values="0.4;0.75;0.4" dur="3s" repeatCount="indefinite" />
-                        </rect>
-                        <rect x="186" y="124" width="40" height="3.5" rx="1.75" fill="hsl(160, 20%, 80%)" opacity="0.3" />
-
-                        {/* Divider */}
-                        <rect x="165" y="137" width="148" height="1" rx="0.5" fill="hsl(168, 65%, 45%)" opacity="0.18" />
-
-                        {/* Bullet item 1 */}
-                        <rect x="168" y="143" width="5" height="5" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.55" />
-                        <rect x="177" y="144" width="92" height="3" rx="1.5" fill="hsl(160, 20%, 88%)" opacity="0.55" />
-
-                        {/* Bullet item 2 */}
-                        <rect x="168" y="153" width="5" height="5" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.45" />
-                        <rect x="177" y="154" width="68" height="3" rx="1.5" fill="hsl(160, 20%, 88%)" opacity="0.45" />
-
-                        {/* Bullet item 3 */}
-                        <rect x="168" y="163" width="5" height="5" rx="1" fill="hsl(168, 65%, 45%)" opacity="0.35" />
-                        <rect x="177" y="164" width="80" height="3" rx="1.5" fill="hsl(160, 20%, 88%)" opacity="0.38" />
-
-                        {/* Bottom fading text lines */}
-                        <rect x="168" y="175" width="86" height="3" rx="1.5" fill="hsl(160, 20%, 85%)" opacity="0.28" />
-                        <rect x="168" y="182" width="60" height="3" rx="1.5" fill="hsl(160, 20%, 85%)" opacity="0.2" />
-                        <rect x="168" y="189" width="74" height="3" rx="1.5" fill="hsl(160, 20%, 85%)" opacity="0.15" />
-
-                        {/* AI badge */}
-                        <rect x="268" y="172" width="40" height="18" rx="9" fill="hsl(168, 70%, 34%)" opacity="0.85" />
-                        <text x="288" y="185" textAnchor="middle" fill="white" fontSize="9" fontWeight="700" fontFamily="sans-serif">AI</text>
+                        {/* Text lines on screen (EMR notes) */}
+                        <rect x="170" y="175" width="80" height="4" rx="2" fill="hsl(160, 20%, 90%)" opacity="0.5" />
+                        <rect x="170" y="185" width="60" height="4" rx="2" fill="hsl(160, 20%, 90%)" opacity="0.35" />
+                        <rect x="170" y="195" width="70" height="4" rx="2" fill="hsl(160, 20%, 90%)" opacity="0.25" />
+                        {/* AI badge on screen */}
+                        <rect x="270" y="175" width="40" height="18" rx="9" fill="hsl(168, 70%, 34%)" opacity="0.8" />
+                        <text x="290" y="188" textAnchor="middle" fill="white" fontSize="9" fontWeight="700" fontFamily="sans-serif">AI</text>
 
                         {/* Doctor avatar - left */}
                         <circle cx="85" cy="195" r="32" fill="hsl(168, 70%, 34%)" opacity="0.15" />

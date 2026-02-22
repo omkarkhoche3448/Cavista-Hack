@@ -88,10 +88,6 @@ export async function getTranscript(token, sessionId) {
   return authFetch(`${SESSIONS_API}/${sessionId}/transcript`, {}, token);
 }
 
-export async function getRecordingUrl(token, sessionId) {
-  return authFetch(`${SESSIONS_API}/${sessionId}/recording`, {}, token);
-}
-
 export async function uploadRecording(token, sessionId, blob) {
   const formData = new FormData();
   formData.append("file", blob, `session-${sessionId}.webm`);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
-import { getSession, getRecordingUrl } from "@/services/sessionService";
+import { getSession } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getEMRDrafts } from "@/services/emrService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,7 +72,6 @@ export default function SessionDetails() {
   const [sessionData, setSessionData] = useState(null);
   const [documents, setDocuments]     = useState([]);
   const [emrDraft, setEmrDraft]       = useState(null);
-  const [recordingUrl, setRecordingUrl] = useState(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
 
@@ -82,18 +81,15 @@ export default function SessionDetails() {
       setLoading(true);
       setError(null);
       try {
-        const [sess, docs, drafts, recResult] = await Promise.all([
+        const [sess, docs, drafts] = await Promise.all([
           getSession(token, sessionId),
           getSessionDocuments(token, sessionId).catch(() => []),
           getEMRDrafts(token, sessionId).catch(() => []),
-          getRecordingUrl(token, sessionId).catch(() => null),
         ]);
         setSessionData(sess);
         setDocuments(Array.isArray(docs) ? docs : []);
         const approved = (Array.isArray(drafts) ? drafts : []).find((d) => d.status === "approved");
         setEmrDraft(approved || (Array.isArray(drafts) && drafts.length > 0 ? drafts[0] : null));
-        // Prefer presigned URL from dedicated endpoint; fall back to session field
-        setRecordingUrl(recResult?.recording_url ?? recResult?.url ?? sess?.recording_url ?? null);
       } catch (err) {
         console.error("SessionDetails fetch error:", err);
         setError(err.message || "Failed to load session data.");
@@ -228,10 +224,10 @@ export default function SessionDetails() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {recordingUrl ? (
+              {sessionData?.recording_url ? (
                 <audio
                   controls
-                  src={recordingUrl}
+                  src={sessionData.recording_url}
                   className="w-full h-10 rounded-lg"
                 />
               ) : (
