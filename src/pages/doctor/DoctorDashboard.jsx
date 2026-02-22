@@ -76,13 +76,12 @@ const SessionCard = ({ session, onStart, isStarting }) => {
                 <AlertTriangle className="w-3 h-3" />
               </Badge>
             )}
-            <Badge className={`whitespace-nowrap ${
-              session.status === 'active' ? 'bg-primary/10 text-primary' :
+            <Badge className={`whitespace-nowrap ${session.status === 'active' ? 'bg-primary/10 text-primary' :
               session.status === 'accepted' ? 'bg-accent/10 text-accent-foreground' :
-              session.status === 'pending' ? 'bg-secondary text-secondary-foreground' :
-              session.status === 'completed' ? 'bg-muted text-muted-foreground' :
-              'bg-muted text-muted-foreground'
-            }`}>
+                session.status === 'pending' ? 'bg-secondary text-secondary-foreground' :
+                  session.status === 'completed' ? 'bg-muted text-muted-foreground' :
+                    'bg-muted text-muted-foreground'
+              }`}>
               {STATUS_BADGE[session.status]?.label ?? session.status}
             </Badge>
           </div>
@@ -99,7 +98,7 @@ const SessionCard = ({ session, onStart, isStarting }) => {
         <div className="flex items-center justify-between pt-4 border-t border-border">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Clock className="w-3.5 h-3.5" />
-            <span>{new Date(session.created_at).toLocaleDateString()} {new Date(session.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            <span>{new Date(session.created_at).toLocaleDateString()} {new Date(session.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
 
           {(isAccepted || isActive) && (
@@ -233,14 +232,10 @@ export default function DoctorDashboard() {
     setError(null);
     try {
       console.log("[DoctorDashboard] Fetching sessions with token...");
-      const data = await listSessions(token);
+      const data = await listSessions(token, { pageSize: 50 });
       console.log("[DoctorDashboard] API Result:", data);
-      if (Array.isArray(data)) {
-        setSessions(data);
-      } else {
-        toast.warning("Incomplete session data received");
-        setSessions([]);
-      }
+      const sessionsArray = Array.isArray(data) ? data : (data?.sessions || []);
+      setSessions(sessionsArray);
     } catch (err) {
       console.error("[DoctorDashboard] Failed to fetch sessions:", err);
       setError(err.message || "Failed to load sessions");
@@ -650,11 +645,10 @@ export default function DoctorDashboard() {
                             placeholder="patient@example.com"
                             value={formData.email}
                             onChange={(e) => handleFormChange("email", e.target.value)}
-                            className={`h-11 rounded-lg transition-all ${
-                              formErrors.email
-                                ? "border-destructive bg-destructive/5 focus:border-destructive"
-                                : ""
-                            }`}
+                            className={`h-11 rounded-lg transition-all ${formErrors.email
+                              ? "border-destructive bg-destructive/5 focus:border-destructive"
+                              : ""
+                              }`}
                           />
                           {formErrors.email && (
                             <div className="flex items-center gap-2 text-sm text-destructive mt-2 animate-in fade-in">
@@ -675,11 +669,10 @@ export default function DoctorDashboard() {
                             placeholder="Describe the primary reason for this consultation..."
                             value={formData.chiefComplaint}
                             onChange={(e) => handleFormChange("chiefComplaint", e.target.value)}
-                            className={`min-h-[100px] rounded-lg resize-none transition-all ${
-                              formErrors.chiefComplaint
-                                ? "border-destructive bg-destructive/5 focus:border-destructive"
-                                : ""
-                            }`}
+                            className={`min-h-[100px] rounded-lg resize-none transition-all ${formErrors.chiefComplaint
+                              ? "border-destructive bg-destructive/5 focus:border-destructive"
+                              : ""
+                              }`}
                           />
                           <div className="flex items-center justify-between">
                             {formErrors.chiefComplaint && (
@@ -688,10 +681,9 @@ export default function DoctorDashboard() {
                                 <span>{formErrors.chiefComplaint}</span>
                               </div>
                             )}
-                            <span className={`text-xs font-medium ml-auto transition-colors ${
-                              formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH
-                                ? "text-destructive"
-                                : formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH * 0.8
+                            <span className={`text-xs font-medium ml-auto transition-colors ${formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH
+                              ? "text-destructive"
+                              : formData.chiefComplaint.length > COMPLAINT_MAX_LENGTH * 0.8
                                 ? "text-accent"
                                 : "text-muted-foreground"
                               }`}>
@@ -701,11 +693,10 @@ export default function DoctorDashboard() {
                         </div>
 
                         {/* Emergency Flag */}
-                        <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
-                          formData.isEmergency
-                            ? "bg-destructive/5 border-destructive/20"
-                            : "bg-muted border-border"
-                        }`}>
+                        <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${formData.isEmergency
+                          ? "bg-destructive/5 border-destructive/20"
+                          : "bg-muted border-border"
+                          }`}>
                           <input
                             type="checkbox"
                             id="emergency"
@@ -805,9 +796,9 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="flex items-center justify-center gap-1.5 py-4">
                             <div className="w-2 bg-destructive rounded-full animate-recording-bar-1" />
-                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-2" style={{animationDelay: '0.1s'}} />
-                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-3" style={{animationDelay: '0.2s'}} />
-                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-4" style={{animationDelay: '0.3s'}} />
+                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-2" style={{ animationDelay: '0.1s' }} />
+                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-3" style={{ animationDelay: '0.2s' }} />
+                            <div className="w-2 bg-destructive rounded-full animate-recording-bar-4" style={{ animationDelay: '0.3s' }} />
                           </div>
                         </div>
 

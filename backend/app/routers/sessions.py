@@ -21,6 +21,7 @@ from ..ws_manager import manager
 from ..models import (
     CreateSessionRequest,
     SessionResponse,
+    PaginatedSessionsResponse,
     SessionAcceptReject,
     EndSessionRequest,
     TranscriptChunkIn,
@@ -742,9 +743,11 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
 
 
 
-@router.get("", response_model=list[SessionResponse])
+@router.get("", response_model=PaginatedSessionsResponse)
 def list_sessions(
     status_filter: str = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -756,21 +759,32 @@ def list_sessions(
     
     Args:
         status_filter (str, optional): Filter by 'pending', 'active', 'ended', etc.
+        page (int): Page number (starting from 1).
+        page_size (int): Number of items per page.
         
     Returns:
-        list: List of enriched session objects.
+        PaginatedSessionsResponse: List of sessions with metadata.
     """
     role = current_user["role"]
     user_id = current_user["id"]
 
+    # Offset calculation for Supabase (0-indexed)
+    start = (page - 1) * page_size
+    end = start + page_size - 1
+
     query = supabase.table("sessions").select(
         "*, doctor:users!doctor_id(first_name, last_name, email), "
-        "patient:users!patient_id(first_name, last_name, email)"
+        "patient:users!patient_id(first_name, last_name, email)",
+        count="exact"
     )
     query = query.eq("doctor_id", user_id) if role == "doctor" else query.eq("patient_id", user_id)
     if status_filter:
         query = query.eq("status", status_filter)
-    result = query.order("created_at", desc=True).limit(50).execute()
+    
+    result = query.order("created_at", desc=True).range(start, end).execute()
+
+    total_count = result.count or 0
+    total_pages = (total_count + page_size - 1) // page_size
 
     sessions = []
     for s in (result.data or []):
@@ -781,7 +795,14 @@ def list_sessions(
         s["doctor_email"] = doc.get("email")
         s["patient_email"] = pat.get("email")
         sessions.append(s)
-    return sessions
+    
+    return {
+        "sessions": sessions,
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages
+    }
 
 
 @router.get("/patients")

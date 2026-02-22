@@ -153,6 +153,14 @@ class SessionResponse(BaseModel):
     patient_email: Optional[str] = None
 
 
+class PaginatedSessionsResponse(BaseModel):
+    sessions: List[SessionResponse]
+    total_count: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class SessionAcceptReject(BaseModel):
     session_id: str
     action: Literal["accept", "reject"]

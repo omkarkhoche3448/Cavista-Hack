@@ -62,20 +62,14 @@ export default function PatientDashboard() {
     setLoading(true);
     setError(null);
     try {
-      console.log("[PatientDashboard] Fetching data...");
-      const [sessData, docsData] = await Promise.all([
-        listSessions(token),
+      const [sessDataRaw, docsData] = await Promise.all([
+        listSessions(token, { pageSize: 50 }),
         listDocuments(token).catch(() => []),
       ]);
-      console.log("[PatientDashboard] API Results:", { sessData, docsData });
-      if (Array.isArray(sessData)) {
-        setSessions(sessData);
-        setPendingRequests(sessData.filter((s) => s.status === "pending"));
-      } else {
-        toast.warning("Incomplete session data received");
-        setSessions([]);
-        setPendingRequests([]);
-      }
+      console.log("[PatientDashboard] API Results:", { sessDataRaw, docsData });
+      const sessData = Array.isArray(sessDataRaw) ? sessDataRaw : (sessDataRaw?.sessions || []);
+      setSessions(sessData);
+      setPendingRequests(sessData.filter((s) => s.status === "pending"));
       setDocuments(Array.isArray(docsData) ? docsData : []);
     } catch (err) {
       console.error("[PatientDashboard] Failed to fetch data:", err);

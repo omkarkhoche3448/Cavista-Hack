@@ -10,13 +10,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 const STATUS_CONFIG = {
-  completed:  { label: "Completed",  className: "bg-green-100 text-green-800" },
-  active:     { label: "Active",     className: "bg-blue-100 text-blue-800" },
-  accepted:   { label: "Accepted",   className: "bg-blue-100 text-blue-800" },
-  pending:    { label: "Pending",    className: "bg-yellow-100 text-yellow-800" },
+  completed: { label: "Completed", className: "bg-green-100 text-green-800" },
+  active: { label: "Active", className: "bg-blue-100 text-blue-800" },
+  accepted: { label: "Accepted", className: "bg-blue-100 text-blue-800" },
+  pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800" },
   processing: { label: "Processing", className: "bg-blue-100 text-blue-800" },
-  rejected:   { label: "Rejected",   className: "bg-red-100 text-red-800" },
-  ended:      { label: "Ended",      className: "bg-gray-100 text-gray-700" },
+  rejected: { label: "Rejected", className: "bg-red-100 text-red-800" },
+  ended: { label: "Ended", className: "bg-gray-100 text-gray-700" },
 };
 
 function InfoTag({ icon, label, value, color = "bg-gray-100 text-gray-700" }) {
@@ -65,8 +65,10 @@ export default function IndividualPatient() {
       }
 
       if (sessionsResult.status === "fulfilled") {
+        const data = sessionsResult.value;
+        const sessionsArray = Array.isArray(data) ? data : (data?.sessions || []);
         setSessions(
-          (Array.isArray(sessionsResult.value) ? sessionsResult.value : []).filter(
+          sessionsArray.filter(
             (s) => s.patient_id === patientId
           )
         );

@@ -31,9 +31,14 @@ export async function createSession(token, { patientEmail, chiefComplaint, isEme
   }, token);
 }
 
-export async function listSessions(token, statusFilter = null) {
-  const params = statusFilter ? `?status=${statusFilter}` : "";
-  return authFetch(`${SESSIONS_API}${params}`, {}, token);
+export async function listSessions(token, { statusFilter = null, page = 1, pageSize = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (statusFilter) params.append("status", statusFilter);
+  if (page) params.append("page", page);
+  if (pageSize) params.append("page_size", pageSize);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return authFetch(`${SESSIONS_API}${queryString}`, {}, token);
 }
 
 export async function listPatients(token) {
