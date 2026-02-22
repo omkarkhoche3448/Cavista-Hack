@@ -230,7 +230,11 @@ export default function IndividualPatient() {
                   <tr
                     key={session.id}
                     className={`transition-all duration-200 cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50/60`}
-                    onClick={() => navigate(`/doctor/session/${session.id}`)}
+                    onClick={() => navigate(
+                      ['completed', 'ended'].includes(session.status)
+                        ? `/doctor/session-details/${session.id}`
+                        : `/doctor/session/${session.id}`
+                    )}
                   >
                     <td className="px-6 py-4 text-base text-gray-900 font-semibold align-middle">
                       {formatId(session.id)}
@@ -253,7 +257,14 @@ export default function IndividualPatient() {
                       <button
                         title="View Session"
                         className="hover:text-blue-600 focus:outline-none transition-colors p-2 rounded-full hover:bg-blue-100"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/doctor/session/${session.id}`); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(
+                            ['completed', 'ended'].includes(session.status)
+                              ? `/doctor/session-details/${session.id}`
+                              : `/doctor/session/${session.id}`
+                          );
+                        }}
                       >
                         <Eye className="w-6 h-6" />
                       </button>

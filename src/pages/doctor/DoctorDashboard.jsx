@@ -542,16 +542,16 @@ export default function DoctorDashboard() {
                         <circle cx="95" cy="210" r="5" stroke="hsl(168, 65%, 45%)" strokeWidth="1.5" fill="none" opacity="0.7" />
 
                         {/* Patient avatar - right */}
-                        <circle cx="395" cy="195" r="32" fill="hsl(36, 90%, 55%)" opacity="0.15" />
-                        <circle cx="395" cy="185" r="14" fill="hsl(36, 90%, 55%)" opacity="0.5" />
-                        <path d="M370 220 Q370 200 395 200 Q420 200 420 220" fill="hsl(36, 90%, 55%)" opacity="0.4" />
+                        <circle cx="395" cy="195" r="32" fill="hsl(200, 55%, 50%)" opacity="0.15" />
+                        <circle cx="395" cy="185" r="14" fill="hsl(200, 55%, 50%)" opacity="0.5" />
+                        <path d="M370 220 Q370 200 395 200 Q420 200 420 220" fill="hsl(200, 55%, 50%)" opacity="0.4" />
 
                         {/* Connection lines - doctor to screen */}
                         <path d="M117 195 L145 160" stroke="hsl(168, 65%, 45%)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.4">
                           <animate attributeName="strokeDashoffset" values="0;-14" dur="2s" repeatCount="indefinite" />
                         </path>
                         {/* Connection lines - patient to screen */}
-                        <path d="M363 195 L335 160" stroke="hsl(36, 85%, 55%)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.4">
+                        <path d="M363 195 L335 160" stroke="hsl(200, 55%, 50%)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.4">
                           <animate attributeName="strokeDashoffset" values="0;-14" dur="2s" repeatCount="indefinite" />
                         </path>
 
@@ -582,14 +582,14 @@ export default function DoctorDashboard() {
                         </g>
 
                         <g opacity="0.3">
-                          <rect x="385" y="270" width="28" height="34" rx="4" fill="hsl(200, 45%, 10%)" stroke="hsl(36, 85%, 55%)" strokeWidth="1" />
+                          <rect x="385" y="270" width="28" height="34" rx="4" fill="hsl(200, 45%, 10%)" stroke="hsl(200, 55%, 50%)" strokeWidth="1" />
                           {/* PDF header band */}
                           <rect x="385" y="270" width="28" height="11" rx="4" fill="hsl(0, 75%, 55%)" opacity="0.9" />
                           <rect x="385" y="276" width="28" height="5" fill="hsl(0, 75%, 55%)" opacity="0.9" />
                           <text x="399" y="280" textAnchor="middle" fill="white" fontSize="5" fontWeight="700" fontFamily="sans-serif">PDF</text>
-                          <rect x="390" y="287" width="18" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.6" />
-                          <rect x="390" y="292" width="13" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.4" />
-                          <rect x="390" y="297" width="16" height="2" rx="1" fill="hsl(36, 85%, 55%)" opacity="0.3" />
+                          <rect x="390" y="287" width="18" height="2" rx="1" fill="hsl(200, 55%, 50%)" opacity="0.6" />
+                          <rect x="390" y="292" width="13" height="2" rx="1" fill="hsl(200, 55%, 50%)" opacity="0.4" />
+                          <rect x="390" y="297" width="16" height="2" rx="1" fill="hsl(200, 55%, 50%)" opacity="0.3" />
                           <animate attributeName="transform" values="translate(0,0);translate(0,-6);translate(0,0)" dur="4s" begin="1s" repeatCount="indefinite" />
                         </g>
 
@@ -601,7 +601,7 @@ export default function DoctorDashboard() {
 
                         {/* Labels */}
                         <text x="85" y="260" textAnchor="middle" fill="hsl(168, 65%, 45%)" fontSize="10" fontWeight="600" fontFamily="sans-serif" opacity="0.7">Doctor</text>
-                        <text x="395" y="260" textAnchor="middle" fill="hsl(36, 85%, 55%)" fontSize="10" fontWeight="600" fontFamily="sans-serif" opacity="0.7">Patient</text>
+                        <text x="395" y="260" textAnchor="middle" fill="hsl(200, 55%, 50%)" fontSize="10" fontWeight="600" fontFamily="sans-serif" opacity="0.7">Patient</text>
                         <text x="240" y="390" textAnchor="middle" fill="hsl(200, 15%, 55%)" fontSize="10" fontWeight="500" fontFamily="sans-serif" opacity="0.5">Voice-First AI Documentation</text>
 
                         {/* Gradient defs */}

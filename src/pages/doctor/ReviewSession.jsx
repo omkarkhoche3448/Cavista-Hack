@@ -307,7 +307,7 @@ export default function PostSessionReview() {
               </div>
               <div className="flex items-center gap-2">
                 {changeCount > 0 && (
-                  <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-xs gap-1">
+                  <Badge className="bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary border border-primary/20 dark:border-primary/30 text-xs gap-1">
                     <PenLine className="w-3 h-3" />
                     {changeCount} edit{changeCount > 1 ? "s" : ""}
                   </Badge>
@@ -344,7 +344,7 @@ export default function PostSessionReview() {
                     <div
                       key={key}
                       className={`rounded-xl border p-4 transition-all duration-300 ${isModified
-                        ? "border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/10 shadow-md shadow-amber-500/5"
+                        ? "border-primary/30 dark:border-primary/40 bg-primary/5 dark:bg-primary/10 shadow-md shadow-primary/5"
                         : "border-border bg-card hover:border-primary/20"
                         }`}
                     >
@@ -356,7 +356,7 @@ export default function PostSessionReview() {
                         <div className="flex items-center gap-1.5">
                           {isModified && (
                             <>
-                              <Badge variant="outline" className="text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 px-1.5 py-0">
+                              <Badge variant="outline" className="text-[9px] bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary border-primary/30 dark:border-primary/40 px-1.5 py-0">
                                 Modified
                               </Badge>
                               <Button
@@ -402,12 +402,12 @@ export default function PostSessionReview() {
               </div>
 
               {/* Approval warning */}
-              <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+              <div className="p-4 rounded-xl bg-destructive/5 dark:bg-destructive/10 border border-destructive/20 dark:border-destructive/30">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <AlertCircle className="w-5 h-5 text-destructive dark:text-destructive mt-0.5 flex-shrink-0" />
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">This action is irreversible</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                    <p className="text-sm font-semibold text-destructive dark:text-destructive">This action is irreversible</p>
+                    <p className="text-xs text-destructive/80 dark:text-destructive/70 leading-relaxed">
                       By approving, you certify that you have reviewed the AI-generated EMR draft, made necessary edits, and confirm it is clinically accurate. A final, immutable record will be created with a cryptographic checksum.
                     </p>
                   </div>
@@ -421,7 +421,7 @@ export default function PostSessionReview() {
             <div className="max-w-5xl mx-auto flex items-center justify-between px-6 py-4">
               <div className="text-xs text-muted-foreground">
                 {changeCount > 0 ? (
-                  <span className="flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
+                  <span className="flex items-center gap-1.5 font-medium text-primary dark:text-primary">
                     <PenLine className="w-3 h-3" />
                     {changeCount} field{changeCount > 1 ? "s" : ""} modified — edits will be saved with approval
                   </span>

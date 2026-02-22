@@ -9,7 +9,7 @@ const TYPE_CONFIG = {
   imaging:           { icon: FileImage, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-l-purple-500" },
   prescription:      { icon: Pill,      color: "text-emerald-500",bg: "bg-emerald-500/10",border: "border-l-emerald-500" },
   discharge_summary: { icon: FileHeart, color: "text-rose-500",   bg: "bg-rose-500/10",   border: "border-l-rose-500" },
-  referral_letter:   { icon: FileText,  color: "text-amber-500",  bg: "bg-amber-500/10",  border: "border-l-amber-500" },
+  referral_letter:   { icon: FileText,  color: "text-sky-500",  bg: "bg-sky-500/10",  border: "border-l-sky-500" },
   insurance:         { icon: Shield,    color: "text-cyan-500",   bg: "bg-cyan-500/10",   border: "border-l-cyan-500" },
   other:             { icon: File,      color: "text-slate-400",  bg: "bg-slate-500/10",  border: "border-l-slate-400" },
 };

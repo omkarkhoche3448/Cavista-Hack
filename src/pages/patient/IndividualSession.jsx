@@ -171,9 +171,9 @@ export default function IndividualSessionSummary() {
 
         {/* Warnings & Follow Up */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="border-none shadow-xl shadow-amber-500/5 border-l-4 border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/10">
+          <Card className="border-none shadow-xl shadow-destructive/5 border-l-4 border-l-destructive/60 bg-destructive/5 dark:bg-destructive/10">
             <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-amber-600 flex items-center gap-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-destructive flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 Important Warnings
               </CardTitle>
@@ -181,8 +181,8 @@ export default function IndividualSessionSummary() {
             <CardContent>
               <div className="space-y-3">
                 {summary.warnings?.map((w, i) => (
-                  <p key={i} className="text-sm font-medium text-amber-950 dark:text-amber-200 flex items-start gap-2">
-                    <span className="text-amber-500 font-bold">•</span>
+                  <p key={i} className="text-sm font-medium text-foreground dark:text-foreground/80 flex items-start gap-2">
+                    <span className="text-destructive font-bold">•</span>
                     {typeof w === 'string' ? w : w.warning}
                   </p>
                 ))}

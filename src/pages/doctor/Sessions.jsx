@@ -32,7 +32,6 @@ export default function AllSessions() {
     setError(null);
     try {
       const data = await listSessions(token, { page: currentPage, pageSize: PAGE_SIZE });
-      // Data format is now { sessions, total_count, page, page_size, total_pages }
       setSessions(Array.isArray(data.sessions) ? data.sessions : []);
       setTotalPages(data.total_pages || 1);
     } catch (err) {
@@ -132,7 +131,11 @@ export default function AllSessions() {
                         <button
                           title="View Details"
                           className="hover:text-blue-600 focus:outline-none transition-colors p-2 rounded-full hover:bg-blue-100"
-                          onClick={() => navigate(`/doctor/session/${session.id}`)}
+                          onClick={() => navigate(
+                            ['completed', 'ended'].includes(session.status)
+                              ? `/doctor/session-details/${session.id}`
+                              : `/doctor/session/${session.id}`
+                          )}
                         >
                           <Eye className="w-6 h-6" />
                         </button>

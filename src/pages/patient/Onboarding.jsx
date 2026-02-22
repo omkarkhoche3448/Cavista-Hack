@@ -407,7 +407,7 @@ export default function Onboarding() {
                             {step === 4 && (
                                 <PageTransition key="step4">
                                     <div className="space-y-2">
-                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-600 text-xs font-bold mb-2">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold mb-2">
                                             <Phone className="w-3 h-3" /> EMERGENCY & INSURANCE
                                         </div>
                                         <h1 className="text-3xl font-black text-slate-900 tracking-tight">Final Details</h1>

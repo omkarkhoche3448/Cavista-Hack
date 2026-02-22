@@ -341,11 +341,11 @@ function PatientWaitingRoom({ sessionId, sessionData, token, subscribe, isProces
 
                 {/* Processing Indicator */}
                 {isProcessing && (
-                    <Card className="border-2 border-amber-200 border-dashed bg-amber-50/60 shadow-xl">
+                    <Card className="border-2 border-border border-dashed bg-muted/30 shadow-xl">
                         <CardContent className="p-8 text-center">
-                            <Loader2 className="w-12 h-12 text-amber-600 animate-spin mx-auto mb-4" />
+                            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
                             <h3 className="text-xl font-bold text-slate-900">AI Processing in Progress</h3>
-                            <p className="text-sm text-amber-700 mt-2 max-w-md mx-auto">
+                            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
                                 🧠 Our AI is generating your EMR draft, ICD codes, and clinical summary.
                                 This usually takes 1–2 minutes. You'll be notified when it's ready.
                             </p>
@@ -521,23 +521,23 @@ function PatientWaitingRoom({ sessionId, sessionData, token, subscribe, isProces
                                         {processingDocs.map((doc) => (
                                             <div
                                                 key={doc.id}
-                                                className="flex items-center gap-4 p-4 rounded-xl border border-amber-100 bg-amber-50/50 opacity-60"
+                                                className="flex items-center gap-4 p-4 rounded-xl border border-border bg-muted/30 opacity-60"
                                             >
                                                 <div className="flex-shrink-0">
-                                                    <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
+                                                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
                                                 </div>
-                                                <div className="p-2.5 rounded-xl bg-amber-100 text-amber-600">
+                                                <div className="p-2.5 rounded-xl bg-muted text-muted-foreground">
                                                     <FileText className="w-5 h-5" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-bold text-sm text-slate-900 truncate">
                                                         {doc.title || doc.file_name}
                                                     </h4>
-                                                    <p className="text-xs text-amber-600 mt-0.5">
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
                                                         AI analysis in progress...
                                                     </p>
                                                 </div>
-                                                <Badge className="bg-amber-100 text-amber-700 border-none text-[10px] font-bold animate-pulse">
+                                                <Badge className="bg-muted text-muted-foreground border-none text-[10px] font-bold animate-pulse">
                                                     Processing
                                                 </Badge>
                                             </div>
@@ -751,9 +751,9 @@ function PatientSummaryView({ sessionId, token }) {
 
                 {/* Warnings & Follow Up */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card className="border-none shadow-xl shadow-amber-500/5 border-l-4 border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/10">
+                    <Card className="border-none shadow-xl shadow-destructive/5 border-l-4 border-l-destructive/60 bg-destructive/5 dark:bg-destructive/10">
                         <CardHeader>
-                            <CardTitle className="text-sm font-bold uppercase tracking-widest text-amber-600 flex items-center gap-2">
+                            <CardTitle className="text-sm font-bold uppercase tracking-widest text-destructive flex items-center gap-2">
                                 <AlertCircle className="w-4 h-4" />
                                 Important Warnings
                             </CardTitle>
@@ -763,9 +763,9 @@ function PatientSummaryView({ sessionId, token }) {
                                 {summary.warnings?.map((w, i) => (
                                     <p
                                         key={i}
-                                        className="text-sm font-medium text-amber-950 dark:text-amber-200 flex items-start gap-2"
+                                        className="text-sm font-medium text-foreground dark:text-foreground/80 flex items-start gap-2"
                                     >
-                                        <span className="text-amber-500 font-bold">•</span>
+                                        <span className="text-destructive font-bold">•</span>
                                         {typeof w === "string" ? w : w.warning}
                                     </p>
                                 ))}
