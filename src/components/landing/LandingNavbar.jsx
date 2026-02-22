@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Activity, LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { ThemeToggle } from "@/components/theme-toggle";
+// import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/features/auth";
 import { signOut } from "@/services/authService";
 
@@ -38,7 +38,7 @@ const LandingNavbar = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
+          {/* <ThemeToggle /> */}
           {!loading && (
             <>
               {isAuthenticated ? (

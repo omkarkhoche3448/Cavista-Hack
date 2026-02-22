@@ -43,19 +43,37 @@ export default function IndividualPatient() {
   const { session: authSession, loading: authLoading } = useAuth();
   const token = authSession?.access_token;
 
+  const PAGE_SIZE = 10;
+
   const [patient, setPatient] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchData = useCallback(async () => {
     if (!token) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
+      // Fetch all session pages (API max page_size is 100)
+      const fetchAllSessions = async () => {
+        const allSessions = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const data = await listSessions(token, { page, pageSize: 100 });
+          const arr = Array.isArray(data) ? data : (data?.sessions || []);
+          allSessions.push(...arr);
+          totalPages = data?.total_pages || 1;
+          page++;
+        } while (page <= totalPages);
+        return allSessions;
+      };
+
       const [patientResult, sessionsResult] = await Promise.allSettled([
         getPatient(token, patientId),
-        listSessions(token),
+        fetchAllSessions(),
       ]);
 
       if (patientResult.status === "fulfilled") {
@@ -65,13 +83,7 @@ export default function IndividualPatient() {
       }
 
       if (sessionsResult.status === "fulfilled") {
-        const data = sessionsResult.value;
-        const sessionsArray = Array.isArray(data) ? data : (data?.sessions || []);
-        setSessions(
-          sessionsArray.filter(
-            (s) => s.patient_id === patientId
-          )
-        );
+        setSessions(sessionsResult.value.filter((s) => s.patient_id === patientId));
         setError(null);
       } else {
         setError(sessionsResult.reason?.message || "Failed to load sessions");
@@ -94,6 +106,9 @@ export default function IndividualPatient() {
   const gender = patient?.gender
     ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1).replace(/_/g, " ")
     : null;
+
+  const totalPages = Math.max(1, Math.ceil(sessions.length / PAGE_SIZE));
+  const pagedSessions = sessions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -224,7 +239,7 @@ export default function IndividualPatient() {
                 </td>
               </tr>
             ) : (
-              sessions.map((session, idx) => {
+              pagedSessions.map((session, idx) => {
                 const statusCfg = STATUS_CONFIG[session.status] ?? { label: session.status, className: "bg-gray-100 text-gray-700" };
                 return (
                   <tr
@@ -275,6 +290,31 @@ export default function IndividualPatient() {
             )}
           </tbody>
         </table>
+
+        {!loading && sessions.length > 0 && (
+          <div className="px-6 py-4 bg-white border-t border-gray-100 flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              Page <span className="font-medium text-gray-900">{currentPage}</span> of{" "}
+              <span className="font-medium text-gray-900">{totalPages}</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
