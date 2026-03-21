@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql.expression import text
-from sqlalchemy.sql.sqltypes import TIMESTAMP
+"""
+Deprecated module.
 
-from .db import Base
+The AI service no longer manages database models. This file is kept to avoid import
+errors if older code paths still reference `app.models`.
+"""
+
+__all__: list[str] = []

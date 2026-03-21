@@ -975,7 +975,15 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     old_row JSONB := NULL;
     new_row JSONB := NULL;
+    action_value audit_action;
 BEGIN
+    action_value := CASE TG_OP
+        WHEN 'INSERT' THEN 'CREATE'
+        WHEN 'UPDATE' THEN 'UPDATE'
+        WHEN 'DELETE' THEN 'DELETE'
+        ELSE 'UPDATE'
+    END;
+
     IF TG_OP = 'DELETE' THEN
         old_row := to_jsonb(OLD);
     ELSIF TG_OP = 'INSERT' THEN
@@ -990,7 +998,7 @@ BEGIN
         resource_id, old_values, new_values, phi_accessed, created_at
     ) VALUES (
         NULLIF(current_setting('app.current_user_id', TRUE), '')::UUID,
-        TG_OP::audit_action,
+        action_value,
         TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME,
         TG_TABLE_NAME,
         COALESCE((new_row->>'id'), (old_row->>'id')),

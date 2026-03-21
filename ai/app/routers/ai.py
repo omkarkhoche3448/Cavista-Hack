@@ -1,19 +1,28 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from google import genai
-from google.genai import types
+try:
+    from google import genai  # type: ignore
+    from google.genai import types  # type: ignore
+except Exception:  # pragma: no cover
+    genai = None
+    types = None
 import base64
 import io
 import requests
 import json
 from datetime import datetime
-from PIL import Image as PILImage 
-import fitz # PyMuPDF
-import boto3
-from urllib.parse import urlparse
+try:
+    from PIL import Image as PILImage  # type: ignore
+except Exception:  # pragma: no cover
+    PILImage = None
+try:
+    import fitz  # type: ignore # PyMuPDF
+except Exception:  # pragma: no cover
+    fitz = None
 
 
 from app.utils import search_icd_code
+from ..s3_utils import get_s3_client, parse_s3_url
 from ..schemas import (
     LabReportRequest,
     LabReportSummaryResponse,
@@ -38,46 +47,6 @@ router = APIRouter(
 def get_settings():
     return Settings()
 
-def get_s3_client(settings: Settings):
-    """Create and return an authenticated boto3 S3 client."""
-    return boto3.client(
-        "s3",
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_REGION,
-    )
-
-def parse_s3_url(url: str):
-    """
-    Parse an S3 URL and return (bucket, key).
-    Supports:
-      - s3://bucket/key
-      - https://bucket.s3.amazonaws.com/key
-      - https://bucket.s3.region.amazonaws.com/key
-      - https://s3.amazonaws.com/bucket/key
-      - https://s3.region.amazonaws.com/bucket/key
-    Returns None if not an S3 URL.
-    """
-    parsed = urlparse(url)
-
-    # s3:// scheme
-    if parsed.scheme == "s3":
-        return parsed.netloc, parsed.path.lstrip("/")
-
-    # HTTPS virtual-hosted style: bucket.s3[.region].amazonaws.com/key
-    if parsed.hostname and ".s3" in parsed.hostname and "amazonaws.com" in parsed.hostname:
-        bucket = parsed.hostname.split(".s3")[0]
-        key = parsed.path.lstrip("/")
-        return bucket, key
-
-    # HTTPS path style: s3[.region].amazonaws.com/bucket/key
-    if parsed.hostname and parsed.hostname.startswith("s3") and "amazonaws.com" in parsed.hostname:
-        parts = parsed.path.lstrip("/").split("/", 1)
-        if len(parts) == 2:
-            return parts[0], parts[1]
-
-    return None
-
 def download_pdf_content(url: str, settings: Settings) -> bytes:
     """
     Download PDF content from a URL.
@@ -86,7 +55,10 @@ def download_pdf_content(url: str, settings: Settings) -> bytes:
     s3_info = parse_s3_url(url)
     if s3_info:
         bucket, key = s3_info
-        s3_client = get_s3_client(settings)
+        try:
+            s3_client = get_s3_client(settings)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"S3 download requires boto3 configuration: {str(e)}")
         try:
             response = s3_client.get_object(Bucket=bucket, Key=key)
             return response["Body"].read()
@@ -102,11 +74,84 @@ def download_image(url: str):
     try:
         response = requests.get(url)
         if response.status_code == 200:
+            if not PILImage:
+                return None
             return PILImage.open(io.BytesIO(response.content))
         return None
     except Exception:
         return None
 
+
+def _is_quota_or_rate_limit_error(err: Exception) -> bool:
+    msg = str(err) or ""
+    up = msg.upper()
+    return (
+        "RESOURCE_EXHAUSTED" in up
+        or "RATE LIMIT" in up
+        or "QUOTA" in up
+        or "429" in msg
+    )
+
+
+def _simple_lab_fallback(text: str, report_type: str | None = None) -> dict:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return {
+            "summary": "No text could be extracted from the document.",
+            "key_findings": [],
+            "abnormal_results": [],
+            "recommendations": "Please upload a clearer PDF or an OCR-friendly version.",
+        }
+
+    lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
+    unit_markers = ("mg/dl", "mmol", "g/dl", "iu/l", "u/l", "mmhg", "bpm", "%", "/ul")
+    key_findings: list[str] = []
+    abnormal_results: list[str] = []
+
+    for ln in lines[:600]:
+        ln_low = ln.lower()
+        if any(m in ln_low for m in unit_markers) or any(
+            m in ln_low
+            for m in ("hemoglobin", "glucose", "creatinine", "cholesterol", "platelet", "wbc", "rbc", "hba1c")
+        ):
+            if len(key_findings) < 12:
+                key_findings.append(ln[:240])
+        if any(m in ln_low for m in ("high", "low", "abnormal", "flag", "reference", "range")):
+            if len(abnormal_results) < 12:
+                abnormal_results.append(ln[:240])
+
+    summary_seed = " ".join(lines[:20])[:900]
+    summary_prefix = f"{report_type or 'Lab report'} received. " if report_type else "Lab report received. "
+    return {
+        "summary": summary_prefix + (summary_seed or cleaned[:900]),
+        "key_findings": key_findings,
+        "abnormal_results": abnormal_results,
+        "recommendations": "Review any flagged/abnormal values and correlate clinically. Consider repeat testing if results are unexpected.",
+        "model_used": "fallback",
+    }
+
+
+def _simple_emr_fallback(req: EMRRequest) -> dict:
+    conversation = (req.conversation or "").strip()
+    chief = (req.chief_complaint or "").strip() or "General consultation"
+    hpi = conversation[:1200] if conversation else "Transcript unavailable."
+    return {
+        "chief_complaint": chief,
+        "history_present_illness": hpi,
+        "past_medical_history": [],
+        "medications": [],
+        "allergies": [],
+        "vital_signs": {},
+        "review_of_systems": [],
+        "physical_examination": "",
+        "assessment": "Pending AI processing. Please review the transcript and document findings.",
+        "diagnoses": [],
+        "treatment_plan": [],
+        "medications_prescribed": [],
+        "follow_up_plan": "",
+        "patient_instructions": "",
+        "model_used": "fallback",
+    }
 
 
 
@@ -115,9 +160,15 @@ def analyze_lab_report(
     req: LabReportRequest,
     settings: Settings = Depends(get_settings)
 ):
-    if not fitz:
-         raise HTTPException(status_code=500, detail="PyMuPDF (fitz) is not installed.")
     try:
+        if not fitz:
+            return {
+                "summary": "PDF parsing is unavailable (PyMuPDF not installed).",
+                "key_findings": [],
+                "abnormal_results": [],
+                "recommendations": "Install PyMuPDF in the AI service or upload text-based reports.",
+            }
+
         pdf_content = None
         
         if req.pdf_url:
@@ -135,6 +186,8 @@ def analyze_lab_report(
         if not text.strip():
              raise HTTPException(status_code=400, detail="Could not extract text from PDF. It might be an image-only PDF.")
 
+        if not genai or not types or not settings.GOOGLE_API_KEY:
+            return _simple_lab_fallback(text, req.report_type)
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         
         schema = {
@@ -163,11 +216,16 @@ def analyze_lab_report(
             response_schema=schema
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite", # Upgraded to 2.0
-            contents=[prompt],
-            config=config
-        )
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-lite", # Upgraded to 2.0
+                contents=[prompt],
+                config=config
+            )
+        except Exception as e:
+            if _is_quota_or_rate_limit_error(e):
+                return _simple_lab_fallback(text, req.report_type)
+            raise
 
         if not response or not response.text:
             raise ValueError("Empty response from GenAI")
@@ -182,9 +240,9 @@ def lab_report_to_json(
     req: LabReportRequest,
     settings: Settings = Depends(get_settings)
 ):
-    if not fitz:
-         raise HTTPException(status_code=500, detail="PyMuPDF (fitz) is not installed.")
     try:
+        if not fitz:
+            return {"report": []}
         pdf_content = None
         if req.pdf_base64:
             pdf_content = base64.b64decode(req.pdf_base64)
@@ -203,6 +261,9 @@ def lab_report_to_json(
         if not text.strip():
              raise HTTPException(status_code=400, detail="Could not extract text from PDF. It might be an image-only PDF.")
 
+        if not genai or not types or not settings.GOOGLE_API_KEY:
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            return {"report": [ln[:500] for ln in lines[:400]]}
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         
         schema = {
@@ -226,11 +287,17 @@ def lab_report_to_json(
             response_schema=schema
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
-            contents=[prompt],
-            config=config
-        )
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-lite",
+                contents=[prompt],
+                config=config
+            )
+        except Exception as e:
+            if _is_quota_or_rate_limit_error(e):
+                lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+                return {"report": [ln[:500] for ln in lines[:400]]}
+            raise
 
         if not response or not response.text:
             raise ValueError("Empty response from GenAI")
@@ -246,6 +313,8 @@ def generate_emr(
     settings: Settings = Depends(get_settings)
 ):
     try:
+        if not genai or not types or not settings.GOOGLE_API_KEY:
+            return _simple_emr_fallback(req)
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
         schema = {
@@ -294,11 +363,16 @@ def generate_emr(
             response_schema=schema
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
-            contents=[prompt],
-            config=config
-        )
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-lite",
+                contents=[prompt],
+                config=config
+            )
+        except Exception as e:
+            if _is_quota_or_rate_limit_error(e):
+                return _simple_emr_fallback(req)
+            raise
 
         if not response or not response.text:
             raise ValueError("Empty response from GenAI")
@@ -356,7 +430,7 @@ def suggest_treatments(
     """
     Treatment suggestions via Gemini. Returns a JSON array of suggestions.
     """
-    if not settings.GOOGLE_API_KEY:
+    if not genai or not types or not settings.GOOGLE_API_KEY:
         return []
 
     client = genai.Client(api_key=settings.GOOGLE_API_KEY)
@@ -391,14 +465,19 @@ def suggest_treatments(
         response_mime_type="application/json",
         response_schema=schema,
     )
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-lite",
-        contents=[prompt],
-        config=config,
-    )
-    if not response or not response.text:
-        return []
-    return json.loads(response.text)
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=[prompt],
+            config=config,
+        )
+        if not response or not response.text:
+            return []
+        return json.loads(response.text)
+    except Exception as e:
+        if _is_quota_or_rate_limit_error(e):
+            return []
+        raise
 
 
 @router.post("/generate-summary")
@@ -407,7 +486,7 @@ def generate_summary(
     settings: Settings = Depends(get_settings),
 ):
     """Generate a patient-friendly visit summary."""
-    if not settings.GOOGLE_API_KEY:
+    if not genai or not types or not settings.GOOGLE_API_KEY:
         return {
             "summary_text": "Your session summary is being processed. Please check back later.",
             "key_takeaways": [],
@@ -443,14 +522,25 @@ def generate_summary(
         response_mime_type="application/json",
         response_schema=schema,
     )
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-lite",
-        contents=[prompt],
-        config=config,
-    )
-    if not response or not response.text:
-        return {"summary_text": "Summary unavailable.", "key_takeaways": [], "medications_list": [], "follow_up_notes": "", "warnings": []}
-    return json.loads(response.text)
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=[prompt],
+            config=config,
+        )
+        if not response or not response.text:
+            return {"summary_text": "Summary unavailable.", "key_takeaways": [], "medications_list": [], "follow_up_notes": "", "warnings": []}
+        return json.loads(response.text)
+    except Exception as e:
+        if _is_quota_or_rate_limit_error(e):
+            return {
+                "summary_text": "Your session summary is being processed. Please check back later.",
+                "key_takeaways": [],
+                "medications_list": [],
+                "follow_up_notes": "",
+                "warnings": [],
+            }
+        raise
 
 
 @router.post("/live-insight")
@@ -459,7 +549,7 @@ def live_insight(
     settings: Settings = Depends(get_settings),
 ):
     """Return a short real-time clinical insight string."""
-    if not settings.GOOGLE_API_KEY:
+    if not genai or not types or not settings.GOOGLE_API_KEY:
         return {"insight": "Live insights are not available right now."}
 
     client = genai.Client(api_key=settings.GOOGLE_API_KEY)
@@ -483,14 +573,19 @@ def live_insight(
         response_mime_type="application/json",
         response_schema=schema,
     )
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-lite",
-        contents=[prompt],
-        config=config,
-    )
-    if not response or not response.text:
-        return {"insight": "No insight generated."}
-    return json.loads(response.text)
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=[prompt],
+            config=config,
+        )
+        if not response or not response.text:
+            return {"insight": "No insight generated."}
+        return json.loads(response.text)
+    except Exception as e:
+        if _is_quota_or_rate_limit_error(e):
+            return {"insight": "Live insights are temporarily unavailable due to rate limits."}
+        raise
 
 
 def generate_emr_pdf(emr_data: dict) -> bytes:
@@ -598,7 +693,10 @@ def generate_emr_pdf(emr_data: dict) -> bytes:
     # ── Sections ──
     sections = [
         ("Chief Complaint", emr_data.get("chief_complaint")),
-        ("History of Present Illness", emr_data.get("history_of_present_illness")),
+        (
+            "History of Present Illness",
+            emr_data.get("history_of_present_illness") or emr_data.get("history_present_illness"),
+        ),
         ("Past Medical History", emr_data.get("past_medical_history", [])),
         ("Medications", emr_data.get("medications", [])),
         ("Allergies", emr_data.get("allergies", [])),
@@ -633,6 +731,13 @@ def generate_emr_pdf_endpoint(
 ):
     """Generate an EMR and return it as a downloadable PDF."""
     try:
+        if not fitz:
+            raise HTTPException(status_code=503, detail="PyMuPDF (fitz) is not installed.")
+        if not genai or not types:
+            raise HTTPException(status_code=503, detail="google-genai is not installed/configured.")
+        if not settings.GOOGLE_API_KEY:
+            raise HTTPException(status_code=503, detail="GOOGLE_API_KEY is not configured.")
+
         client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
         schema = {

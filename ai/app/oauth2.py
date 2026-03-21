@@ -1,63 +1,36 @@
-import jwt
-from datetime import datetime, timedelta
+"""
+Auth helpers for the AI service.
+
+The AI service is designed to be deployable without a database dependency. The previous
+OAuth/JWT implementation relied on SQLAlchemy models and DB sessions and would crash
+on import when those were removed.
+
+If you want to protect the AI service, set `AI_API_KEY` in `ai/.env` and use the
+`require_api_key` dependency in routes.
+"""
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from . import models, db
-from sqlalchemy.orm import Session
+from fastapi.security import APIKeyHeader
 
 from .config import Settings
 
-settings = Settings()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+_settings = Settings()
+_api_key_header = APIKeyHeader(name=_settings.AI_API_KEY_HEADER, auto_error=False)
 
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+def require_api_key(api_key: str | None = Depends(_api_key_header)) -> None:
+    """
+    Optional API-key protection.
 
-    return encoded_jwt
-
-
-def verify_token(token: str, credentials_exception):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        if user_id is None:
-            raise credentials_exception
-        token_data = {"id": user_id}
-        return token_data
-    except Exception:
-        raise credentials_exception
-
-
-def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(db.get_db)
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    token = verify_token(token, credentials_exception)
-    user = db.query(models.Clients).filter(models.Clients.id == token["id"]).first()
-    if not user:
-        raise credentials_exception
-    else:
-        return user
-
-
-def create_reset_token(email: str, expires_delta: int):
-    to_encode = {"email": email}
-    expire = datetime.utcnow() + timedelta(minutes=expires_delta)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-    return encoded_jwt
+    - If `AI_API_KEY` is empty, authentication is disabled and the dependency allows all requests.
+    - If set, requests must include the matching header (default: `X-API-Key`).
+    """
+    configured_key = (_settings.AI_API_KEY or "").strip()
+    if not configured_key:
+        return
+    if not api_key or api_key.strip() != configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API key",
+        )
