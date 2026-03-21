@@ -12,12 +12,17 @@ EXPECTED_TABLES = {
         "sessions", "session_state_history", "medical_documents",
         "session_document_shares", "transcript_chunks", "final_transcripts",
         "integration_logs",
-    ],
-    "comms": ["ws_connections", "ws_events", "notifications"],
-    "ai":    ["jobs", "prompt_templates", "pre_session_insights"],
-    "emr":   [
-        "icd_codes", "emr_drafts", "final_emrs", "icd_mappings",
+        "doctor_notes",
+        "ws_connections", "ws_events",
+        "notifications",
+        "pre_session_insights",
+        "emr_drafts", "final_emrs", "icd_mappings",
         "treatment_suggestions", "patient_summaries", "export_logs",
+    ],
+    "comms": [],
+    "ai":    ["jobs", "prompt_templates"],
+    "emr":   [
+        "icd_codes",
     ],
     "audit": ["audit_logs"],
 }

@@ -4,6 +4,10 @@
 -- These tables were in emr/comms/ai schemas which are NOT exposed by Supabase REST API.
 -- =============================================================================
 
+-- Extensions (safe no-ops on Supabase if already installed)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 -- emr_drafts
 CREATE TABLE IF NOT EXISTS public.emr_drafts (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -140,25 +144,78 @@ CREATE TABLE IF NOT EXISTS public.pre_session_insights (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- doctor_notes (CRUD via /api/notes)
+CREATE TABLE IF NOT EXISTS public.doctor_notes (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    doctor_id   UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    patient_id  UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    session_id  UUID REFERENCES public.sessions(id) ON DELETE SET NULL,
+    notes       TEXT[] NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ws_connections / ws_events (optional; used by clear_db.py and future WS persistence)
+CREATE TABLE IF NOT EXISTS public.ws_connections (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    session_id      UUID REFERENCES public.sessions(id),
+    connection_id   TEXT NOT NULL,
+    server_node     VARCHAR(100),
+    status          TEXT NOT NULL DEFAULT 'connected',
+    connected_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    disconnected_at TIMESTAMPTZ,
+    last_ping_at    TIMESTAMPTZ,
+    user_agent      TEXT,
+    ip_address      INET,
+    metadata        JSONB
+);
+
+CREATE TABLE IF NOT EXISTS public.ws_events (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id      UUID REFERENCES public.sessions(id),
+    sender_id       UUID REFERENCES public.users(id),
+    connection_id   TEXT,
+    event_type      TEXT NOT NULL,
+    payload         JSONB NOT NULL DEFAULT '{}',
+    delivered       BOOLEAN NOT NULL DEFAULT FALSE,
+    delivered_at    TIMESTAMPTZ,
+    error           TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- =============================================================================
 -- DISABLE RLS on all public tables so service role key has full access
 -- =============================================================================
-ALTER TABLE public.emr_drafts            DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.final_emrs            DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.icd_mappings          DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.treatment_suggestions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.patient_summaries     DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications         DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pre_session_insights  DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.emr_drafts            DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.final_emrs            DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.icd_mappings          DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.treatment_suggestions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.patient_summaries     DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.notifications         DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.pre_session_insights  DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.doctor_notes          DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.ws_connections        DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.ws_events             DISABLE ROW LEVEL SECURITY;
 
 -- Also disable RLS on existing public tables that had it enabled
-ALTER TABLE public.medical_documents     DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.transcript_chunks     DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.final_transcripts     DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.medical_documents     DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.transcript_chunks     DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.final_transcripts     DISABLE ROW LEVEL SECURITY;
 
 -- =============================================================================
 -- GRANT access to service role and anon role
 -- =============================================================================
-GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+    END IF;
+END;
+$$;

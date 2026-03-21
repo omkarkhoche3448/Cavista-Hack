@@ -110,8 +110,9 @@ CREATE TYPE audit_action AS ENUM (
 -- =============================================================================
 CREATE SCHEMA IF NOT EXISTS public;
 CREATE SCHEMA IF NOT EXISTS audit;
-CREATE SCHEMA IF NOT EXISTS public;
-CREATE SCHEMA IF NOT EXISTS public;
+CREATE SCHEMA IF NOT EXISTS comms;
+CREATE SCHEMA IF NOT EXISTS ai;
+CREATE SCHEMA IF NOT EXISTS emr;
 
 -- =============================================================================
 -- 1. USERS
@@ -277,10 +278,28 @@ CREATE INDEX idx_session_state_history_session_id ON public.session_state_histor
 CREATE INDEX idx_session_state_history_changed_at  ON public.session_state_history(changed_at DESC);
 
 -- =============================================================================
+-- 6b. DOCTOR NOTES (doctor-owned notes, array of strings)
+-- =============================================================================
+
+CREATE TABLE public.doctor_notes (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    doctor_id   UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    patient_id  UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    session_id  UUID REFERENCES public.sessions(id) ON DELETE SET NULL,
+    notes       TEXT[] NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_doctor_notes_doctor_id  ON public.doctor_notes(doctor_id);
+CREATE INDEX idx_doctor_notes_patient_id ON public.doctor_notes(patient_id);
+CREATE INDEX idx_doctor_notes_session_id ON public.doctor_notes(session_id);
+
+-- =============================================================================
 -- 7. WEBSOCKET CONNECTIONS
 -- =============================================================================
 
-CREATE TABLE comms.ws_connections (
+CREATE TABLE public.ws_connections (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id         UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     session_id      UUID REFERENCES public.sessions(id),
@@ -295,16 +314,16 @@ CREATE TABLE comms.ws_connections (
     metadata        JSONB
 );
 
-CREATE INDEX idx_ws_connections_user_id      ON comms.ws_connections(user_id);
-CREATE INDEX idx_ws_connections_session_id   ON comms.ws_connections(session_id);
-CREATE INDEX idx_ws_connections_connection_id ON comms.ws_connections(connection_id);
-CREATE INDEX idx_ws_connections_status       ON comms.ws_connections(status);
+CREATE INDEX idx_ws_connections_user_id      ON public.ws_connections(user_id);
+CREATE INDEX idx_ws_connections_session_id   ON public.ws_connections(session_id);
+CREATE INDEX idx_ws_connections_connection_id ON public.ws_connections(connection_id);
+CREATE INDEX idx_ws_connections_status       ON public.ws_connections(status);
 
 -- =============================================================================
 -- 8. WEBSOCKET EVENTS LOG
 -- =============================================================================
 
-CREATE TABLE comms.ws_events (
+CREATE TABLE public.ws_events (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id      UUID REFERENCES public.sessions(id),
     sender_id       UUID REFERENCES public.users(id),
@@ -317,9 +336,9 @@ CREATE TABLE comms.ws_events (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_ws_events_session_id  ON comms.ws_events(session_id);
-CREATE INDEX idx_ws_events_event_type  ON comms.ws_events(event_type);
-CREATE INDEX idx_ws_events_created_at  ON comms.ws_events(created_at DESC);
+CREATE INDEX idx_ws_events_session_id  ON public.ws_events(session_id);
+CREATE INDEX idx_ws_events_event_type  ON public.ws_events(event_type);
+CREATE INDEX idx_ws_events_created_at  ON public.ws_events(created_at DESC);
 
 -- =============================================================================
 -- 9. MEDICAL DOCUMENTS
@@ -497,7 +516,7 @@ CREATE INDEX idx_prompt_templates_active   ON ai.prompt_templates(is_active);
 -- 15. PRE-SESSION DOCUMENT INSIGHTS
 -- =============================================================================
 
-CREATE TABLE ai.pre_session_insights (
+CREATE TABLE public.pre_session_insights (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id          UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
     document_id         UUID NOT NULL REFERENCES public.medical_documents(id),
@@ -519,8 +538,8 @@ CREATE TABLE ai.pre_session_insights (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_pre_session_insights_session_id  ON ai.pre_session_insights(session_id);
-CREATE INDEX idx_pre_session_insights_document_id ON ai.pre_session_insights(document_id);
+CREATE INDEX idx_pre_session_insights_session_id  ON public.pre_session_insights(session_id);
+CREATE INDEX idx_pre_session_insights_document_id ON public.pre_session_insights(document_id);
 
 -- =============================================================================
 -- 16. ICD-10 REFERENCE TABLE
@@ -552,7 +571,7 @@ CREATE INDEX idx_icd_codes_short_desc_trgm ON emr.icd_codes USING GIN(short_desc
 -- 17. EMR DRAFTS
 -- =============================================================================
 
-CREATE TABLE emr.emr_drafts (
+CREATE TABLE public.emr_drafts (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id              UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
     ai_job_id               UUID REFERENCES ai.jobs(id),
@@ -607,18 +626,18 @@ CREATE TABLE emr.emr_drafts (
     UNIQUE (session_id, version)
 );
 
-CREATE INDEX idx_emr_drafts_session_id ON emr.emr_drafts(session_id);
-CREATE INDEX idx_emr_drafts_status     ON emr.emr_drafts(status);
-CREATE INDEX idx_emr_drafts_version    ON emr.emr_drafts(session_id, version DESC);
+CREATE INDEX idx_emr_drafts_session_id ON public.emr_drafts(session_id);
+CREATE INDEX idx_emr_drafts_status     ON public.emr_drafts(status);
+CREATE INDEX idx_emr_drafts_version    ON public.emr_drafts(session_id, version DESC);
 
 -- =============================================================================
 -- 18. FINAL EMRS (doctor-approved, immutable record)
 -- =============================================================================
 
-CREATE TABLE emr.final_emrs (
+CREATE TABLE public.final_emrs (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id              UUID NOT NULL UNIQUE REFERENCES public.sessions(id),
-    draft_id                UUID NOT NULL REFERENCES emr.emr_drafts(id),
+    draft_id                UUID NOT NULL REFERENCES public.emr_drafts(id),
     doctor_id               UUID NOT NULL REFERENCES public.users(id),
     patient_id              UUID NOT NULL REFERENCES public.users(id),
     version                 INTEGER NOT NULL DEFAULT 1,
@@ -631,25 +650,25 @@ CREATE TABLE emr.final_emrs (
     approved_by             UUID NOT NULL REFERENCES public.users(id),
     is_amended              BOOLEAN NOT NULL DEFAULT FALSE,
     amendment_reason        TEXT,
-    parent_emr_id           UUID REFERENCES emr.final_emrs(id), -- for amendments
+    parent_emr_id           UUID REFERENCES public.final_emrs(id), -- for amendments
 
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_final_emrs_session_id  ON emr.final_emrs(session_id);
-CREATE INDEX idx_final_emrs_patient_id  ON emr.final_emrs(patient_id);
-CREATE INDEX idx_final_emrs_doctor_id   ON emr.final_emrs(doctor_id);
-CREATE INDEX idx_final_emrs_approved_at ON emr.final_emrs(approved_at DESC);
+CREATE INDEX idx_final_emrs_session_id  ON public.final_emrs(session_id);
+CREATE INDEX idx_final_emrs_patient_id  ON public.final_emrs(patient_id);
+CREATE INDEX idx_final_emrs_doctor_id   ON public.final_emrs(doctor_id);
+CREATE INDEX idx_final_emrs_approved_at ON public.final_emrs(approved_at DESC);
 
 -- =============================================================================
 -- 19. ICD CODE MAPPINGS (session-level diagnosis-to-ICD mapping)
 -- =============================================================================
 
-CREATE TABLE emr.icd_mappings (
+CREATE TABLE public.icd_mappings (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id          UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
-    emr_draft_id        UUID REFERENCES emr.emr_drafts(id),
-    final_emr_id        UUID REFERENCES emr.final_emrs(id),
+    emr_draft_id        UUID REFERENCES public.emr_drafts(id),
+    final_emr_id        UUID REFERENCES public.final_emrs(id),
     ai_job_id           UUID REFERENCES ai.jobs(id),
     diagnosis_text      TEXT NOT NULL,                          -- free-text from LLM
     icd_code_id         UUID REFERENCES emr.icd_codes(id),
@@ -669,18 +688,18 @@ CREATE TABLE emr.icd_mappings (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_icd_mappings_session_id   ON emr.icd_mappings(session_id);
-CREATE INDEX idx_icd_mappings_icd_code     ON emr.icd_mappings(icd_code);
-CREATE INDEX idx_icd_mappings_approval     ON emr.icd_mappings(approval_status);
+CREATE INDEX idx_icd_mappings_session_id   ON public.icd_mappings(session_id);
+CREATE INDEX idx_icd_mappings_icd_code     ON public.icd_mappings(icd_code);
+CREATE INDEX idx_icd_mappings_approval     ON public.icd_mappings(approval_status);
 
 -- =============================================================================
 -- 20. TREATMENT SUGGESTIONS
 -- =============================================================================
 
-CREATE TABLE emr.treatment_suggestions (
+CREATE TABLE public.treatment_suggestions (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id          UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
-    emr_draft_id        UUID REFERENCES emr.emr_drafts(id),
+    emr_draft_id        UUID REFERENCES public.emr_drafts(id),
     ai_job_id           UUID REFERENCES ai.jobs(id),
     suggestion_type     VARCHAR(100),                           -- 'medication', 'procedure', 'lifestyle', 'referral'
     title               VARCHAR(300) NOT NULL,
@@ -700,17 +719,17 @@ CREATE TABLE emr.treatment_suggestions (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_treatment_suggestions_session_id ON emr.treatment_suggestions(session_id);
-CREATE INDEX idx_treatment_suggestions_approval   ON emr.treatment_suggestions(approval_status);
+CREATE INDEX idx_treatment_suggestions_session_id ON public.treatment_suggestions(session_id);
+CREATE INDEX idx_treatment_suggestions_approval   ON public.treatment_suggestions(approval_status);
 
 -- =============================================================================
 -- 21. PATIENT SUMMARIES (AI-generated, doctor-approved, sent to patient)
 -- =============================================================================
 
-CREATE TABLE emr.patient_summaries (
+CREATE TABLE public.patient_summaries (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id          UUID NOT NULL UNIQUE REFERENCES public.sessions(id),
-    final_emr_id        UUID REFERENCES emr.final_emrs(id),
+    final_emr_id        UUID REFERENCES public.final_emrs(id),
     ai_job_id           UUID REFERENCES ai.jobs(id),
     summary_text        TEXT NOT NULL,                          -- patient-friendly
     language_code       VARCHAR(10) DEFAULT 'en-US',
@@ -730,14 +749,14 @@ CREATE TABLE emr.patient_summaries (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_patient_summaries_session_id ON emr.patient_summaries(session_id);
-CREATE INDEX idx_patient_summaries_approval   ON emr.patient_summaries(approval_status);
+CREATE INDEX idx_patient_summaries_session_id ON public.patient_summaries(session_id);
+CREATE INDEX idx_patient_summaries_approval   ON public.patient_summaries(approval_status);
 
 -- =============================================================================
 -- 22. NOTIFICATIONS
 -- =============================================================================
 
-CREATE TABLE comms.notifications (
+CREATE TABLE public.notifications (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     recipient_id        UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     sender_id           UUID REFERENCES public.users(id),
@@ -756,18 +775,18 @@ CREATE TABLE comms.notifications (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_notifications_recipient_id ON comms.notifications(recipient_id, is_read);
-CREATE INDEX idx_notifications_session_id   ON comms.notifications(session_id);
-CREATE INDEX idx_notifications_type         ON comms.notifications(notification_type);
-CREATE INDEX idx_notifications_created_at   ON comms.notifications(created_at DESC);
+CREATE INDEX idx_notifications_recipient_id ON public.notifications(recipient_id, is_read);
+CREATE INDEX idx_notifications_session_id   ON public.notifications(session_id);
+CREATE INDEX idx_notifications_type         ON public.notifications(notification_type);
+CREATE INDEX idx_notifications_created_at   ON public.notifications(created_at DESC);
 
 -- =============================================================================
 -- 23. EMR EXPORT LOGS
 -- =============================================================================
 
-CREATE TABLE emr.export_logs (
+CREATE TABLE public.export_logs (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    final_emr_id        UUID NOT NULL REFERENCES emr.final_emrs(id),
+    final_emr_id        UUID NOT NULL REFERENCES public.final_emrs(id),
     session_id          UUID NOT NULL REFERENCES public.sessions(id),
     requested_by        UUID NOT NULL REFERENCES public.users(id),
     export_format       export_format NOT NULL,
@@ -784,9 +803,9 @@ CREATE TABLE emr.export_logs (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_export_logs_final_emr_id ON emr.export_logs(final_emr_id);
-CREATE INDEX idx_export_logs_session_id   ON emr.export_logs(session_id);
-CREATE INDEX idx_export_logs_status       ON emr.export_logs(status);
+CREATE INDEX idx_export_logs_final_emr_id ON public.export_logs(final_emr_id);
+CREATE INDEX idx_export_logs_session_id   ON public.export_logs(session_id);
+CREATE INDEX idx_export_logs_status       ON public.export_logs(status);
 
 -- =============================================================================
 -- 24. INTEGRATION LOGS (HL7/FHIR outbound webhook events)
@@ -795,7 +814,7 @@ CREATE INDEX idx_export_logs_status       ON emr.export_logs(status);
 CREATE TABLE public.integration_logs (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id          UUID REFERENCES public.sessions(id),
-    final_emr_id        UUID REFERENCES emr.final_emrs(id),
+    final_emr_id        UUID REFERENCES public.final_emrs(id),
     integration_type    VARCHAR(100) NOT NULL,                  -- 'FHIR_R4', 'HL7_V2', 'WEBHOOK'
     target_system       VARCHAR(200),
     target_url          TEXT,
@@ -860,11 +879,11 @@ CREATE INDEX idx_audit_logs_session_id    ON audit.audit_logs(session_id);
 ALTER TABLE public.medical_documents       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transcript_chunks       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.final_transcripts       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE emr.emr_drafts                 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE emr.final_emrs                 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE emr.patient_summaries          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE emr.icd_mappings               ENABLE ROW LEVEL SECURITY;
-ALTER TABLE emr.treatment_suggestions      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.emr_drafts              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.final_emrs              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.patient_summaries       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.icd_mappings            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.treatment_suggestions   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit.audit_logs               ENABLE ROW LEVEL SECURITY;
 
 -- Doctors can only see documents shared in their sessions
@@ -991,15 +1010,15 @@ CREATE TRIGGER audit_medical_documents
     FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 CREATE TRIGGER audit_emr_drafts
-    AFTER INSERT OR UPDATE OR DELETE ON emr.emr_drafts
+    AFTER INSERT OR UPDATE OR DELETE ON public.emr_drafts
     FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 CREATE TRIGGER audit_final_emrs
-    AFTER INSERT OR UPDATE OR DELETE ON emr.final_emrs
+    AFTER INSERT OR UPDATE OR DELETE ON public.final_emrs
     FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 CREATE TRIGGER audit_icd_mappings
-    AFTER INSERT OR UPDATE OR DELETE ON emr.icd_mappings
+    AFTER INSERT OR UPDATE OR DELETE ON public.icd_mappings
     FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 -- =============================================================================
@@ -1041,9 +1060,9 @@ SELECT
     ed.version,
     ed.submitted_for_review_at,
     p.first_name || ' ' || p.last_name AS patient_name,
-    (SELECT COUNT(*) FROM emr.icd_mappings im WHERE im.emr_draft_id = ed.id AND im.approval_status = 'pending') AS pending_icd_count,
-    (SELECT COUNT(*) FROM emr.treatment_suggestions ts WHERE ts.emr_draft_id = ed.id AND ts.approval_status = 'pending') AS pending_treatment_count
-FROM emr.emr_drafts ed
+    (SELECT COUNT(*) FROM public.icd_mappings im WHERE im.emr_draft_id = ed.id AND im.approval_status = 'pending') AS pending_icd_count,
+    (SELECT COUNT(*) FROM public.treatment_suggestions ts WHERE ts.emr_draft_id = ed.id AND ts.approval_status = 'pending') AS pending_treatment_count
+FROM public.emr_drafts ed
 JOIN public.sessions s ON s.id = ed.session_id
 JOIN public.users p ON p.id = s.patient_id
 WHERE ed.status = 'pending_approval';
