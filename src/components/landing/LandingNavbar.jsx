@@ -5,6 +5,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/features/auth";
 import { signOut } from "@/services/authService";
 
+const MotionNav = motion.nav;
+
 const LandingNavbar = () => {
   const { isAuthenticated, profile, loading } = useAuth();
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ const LandingNavbar = () => {
   }
 
   return (
-    <motion.nav
+    <MotionNav
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -83,7 +85,7 @@ const LandingNavbar = () => {
           )}
         </div>
       </div>
-    </motion.nav>
+    </MotionNav>
   );
 };
 

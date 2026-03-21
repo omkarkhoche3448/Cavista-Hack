@@ -4,6 +4,17 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth";
 import { signOut } from "@/services/authService";
 
+function NavLink({ to, children }) {
+  return (
+    <Link
+      to={to}
+      className="px-3 py-2 rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+    >
+      {children}
+    </Link>
+  );
+}
+
 export default function Navbar() {
   const { isAuthenticated, profile, loading } = useAuth();
   const navigate = useNavigate();
@@ -24,6 +35,26 @@ export default function Navbar() {
             SEVA<span className="text-primary">मित्र</span>
           </span>
         </Link>
+
+        {!loading && isAuthenticated && (
+          <nav className="hidden md:flex items-center gap-1">
+            {profile?.role === "doctor" ? (
+              <>
+                <NavLink to="/doctor/dashboard">Dashboard</NavLink>
+                <NavLink to="/doctor/sessions">Sessions</NavLink>
+                <NavLink to="/doctor/patients">Patients</NavLink>
+                <NavLink to="/doctor/profile">Profile</NavLink>
+              </>
+            ) : profile?.role === "patient" ? (
+              <>
+                <NavLink to="/patient/dashboard">Dashboard</NavLink>
+                <NavLink to="/patient/sessions">Sessions</NavLink>
+                <NavLink to="/patient/uploads">Uploads</NavLink>
+                <NavLink to="/patient/profile">Profile</NavLink>
+              </>
+            ) : null}
+          </nav>
+        )}
 
         <div className="flex items-center gap-3">
           {!loading && (

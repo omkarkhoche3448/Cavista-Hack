@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - backend/.env
+    environment:
+      # Use the AI container inside compose by default
+      ANALYSIS_API_URL: http://ai:8001
+      # Allow the frontend container / local browser
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ai
+
+  ai:
+    build:
+      context: .
+      dockerfile: ai/Dockerfile
+    env_file:
+      - ai/.env
+    ports:
+      - "8001:8001"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Vite envs are build-time; for local docker usage, bake correct values via your `.env` before building.
+      # This container just serves the built `dist/` via nginx.
+      - NODE_ENV=production
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

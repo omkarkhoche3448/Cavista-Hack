@@ -1,4 +1,3 @@
-import { useAuth } from "@/features/auth";
 import { MOCK_VITALS, MOCK_SUMMARIES } from "../../data/mockData";
 import VitalsOverview from "./VitalsOverview";
 import CriticalWarnings from "./CriticalWarnings";
@@ -6,7 +5,6 @@ import HealthSummaryCard from "./HealthSummaryCard";
 import { Activity, FileText } from "lucide-react";
 
 export default function MyHealthPage() {
-  const { profile } = useAuth();
   const summaries = MOCK_SUMMARIES;
   const latestSummary = summaries[0];
 

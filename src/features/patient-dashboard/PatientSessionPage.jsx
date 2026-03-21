@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { useWebSocket } from "@/context/WebSocketContext";
@@ -22,7 +22,7 @@ import {
   User,
 } from "lucide-react";
 import { getSession } from "@/services/sessionService";
-import { listDocuments, shareDocuments, uploadDocument } from "@/services/documentService";
+import { listDocuments, shareDocuments } from "@/services/documentService";
 import { getPatientSummary } from "@/services/emrService";
 import FileUploadModal from "./FileUploadModal";
 

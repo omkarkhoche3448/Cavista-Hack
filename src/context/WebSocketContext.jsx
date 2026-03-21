@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/features/auth";
 import wsService from "@/services/websocketService";
@@ -12,29 +13,11 @@ export function WebSocketProvider({ children }) {
   // Track the token we last connected with so we don't reconnect unnecessarily
   const connectedTokenRef = useRef(null);
 
+  // Subscribe once to WS lifecycle + notifications (state updates only happen in callbacks)
   useEffect(() => {
-    const token = session?.access_token;
-
-    if (!isAuthenticated || !token) {
-      // User logged out — disconnect
-      connectedTokenRef.current = null;
-      wsService.disconnect();
-      setIsConnected(false);
-      return;
-    }
-
-    // Only (re)connect if the token has actually changed
-    if (connectedTokenRef.current === token) {
-      return;
-    }
-
-    connectedTokenRef.current = token;
-    wsService.connect(token);
-
     const unsub1 = wsService.on("_connected", () => setIsConnected(true));
     const unsub2 = wsService.on("_disconnected", () => setIsConnected(false));
     const unsubExpired = wsService.on("_token_expired", async () => {
-      // Token expired — refresh session so AuthContext updates and triggers reconnect
       connectedTokenRef.current = null;
       await supabase.auth.refreshSession();
     });
@@ -61,10 +44,27 @@ export function WebSocketProvider({ children }) {
       unsubExpired();
       unsub3();
       unsub4();
-      // Don't disconnect here — keep the WS alive across re-renders.
-      // disconnect() is only called when the user logs out (above).
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Connect/disconnect when auth token changes (no direct setState in effect body)
+  useEffect(() => {
+    const token = session?.access_token;
+
+    if (!isAuthenticated || !token) {
+      // User logged out — disconnect
+      connectedTokenRef.current = null;
+      wsService.disconnect();
+      return;
+    }
+
+    // Only (re)connect if the token has actually changed
+    if (connectedTokenRef.current === token) {
+      return;
+    }
+
+    connectedTokenRef.current = token;
+    wsService.connect(token);
   }, [isAuthenticated, session?.access_token]);
 
   const subscribe = useCallback((event, callback) => {

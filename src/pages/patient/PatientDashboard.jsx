@@ -34,7 +34,7 @@ const STATUS_BADGE = {
 
 export default function PatientDashboard() {
   const { profile, session: authSession, loading: authLoading } = useAuth();
-  const { isConnected, subscribe, notifications: wsNotifications } = useWebSocket();
+  const { isConnected, subscribe } = useWebSocket();
   const navigate = useNavigate();
   const token = authSession?.access_token;
 

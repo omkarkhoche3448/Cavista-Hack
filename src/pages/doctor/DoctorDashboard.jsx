@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { listSessions, startSession, createSession } from "@/services/sessionService";
+import { listSessions, createSession } from "@/services/sessionService";
 
 // Form validation constants
 const INITIAL_FORM_STATE = { email: "", chiefComplaint: "", isEmergency: false };
@@ -137,7 +137,6 @@ export default function DoctorDashboard() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isStarting, setIsStarting] = useState(null);
 
   // Inline session form state
   const [showForm, setShowForm] = useState(false);
@@ -346,24 +345,6 @@ export default function DoctorDashboard() {
       setRequestSent(false);
     }
   }, [formData, token, validateForm]);
-
-  // Start (or resume) a session — calls /start then navigates to SessionPage
-  const handleStartSession = useCallback(async (sessionId, isAlreadyActive) => {
-    setIsStarting(sessionId);
-    try {
-      if (!isAlreadyActive) {
-        await startSession(token, sessionId);
-        setSessions((prev) =>
-          prev.map((s) => s.id === sessionId ? { ...s, status: "active" } : s)
-        );
-      }
-      navigate(`/doctor/session/${sessionId}`);
-    } catch (err) {
-      console.error("Failed to start session:", err);
-    } finally {
-      setIsStarting(null);
-    }
-  }, [token, navigate]);
 
   // Handle form field changes - clears field errors on change
   const handleFormChange = useCallback((field, value) => {

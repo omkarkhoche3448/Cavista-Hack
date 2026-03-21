@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import heroImage from "@/assets/hero-illustration.png";
 
+const MotionDiv = motion.div;
+
 const HeroSection = () => {
   const navigate = useNavigate();
 
@@ -17,7 +19,7 @@ const HeroSection = () => {
 
       <div className="container max-w-6xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
@@ -57,9 +59,9 @@ const HeroSection = () => {
                 Auto-generated EMR
               </div>
             </div>
-          </motion.div>
+          </MotionDiv>
 
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
@@ -73,15 +75,15 @@ const HeroSection = () => {
               />
             </div>
             {/* Floating stat card */}
-            <motion.div
+            <MotionDiv
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               className="absolute -bottom-4 -left-4 bg-card rounded-xl shadow-card-lg border p-4"
             >
               <p className="text-xs text-muted-foreground mb-1">EMR Generated In</p>
               <p className="text-2xl font-bold font-heading text-primary">Seconds</p>
-            </motion.div>
-          </motion.div>
+            </MotionDiv>
+          </MotionDiv>
         </div>
       </div>
     </section>

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     AWS_REGION: str = "ap-south-1"
     AWS_S3_BUCKET: str = ""
     ANALYSIS_API_URL: str = "https://cfwsxf61-8000.inc1.devtunnels.ms"
+    CORS_ORIGINS: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

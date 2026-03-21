@@ -6,7 +6,7 @@ import json
 import hashlib
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import Client
 import uuid
 
@@ -260,6 +260,227 @@ def get_patient_summary(
             raise HTTPException(status_code=404, detail="Summary not available yet.")
 
     return result.data
+
+@router.post("/patient-summary/approve")
+async def approve_patient_summary(
+    body: ApproveSummaryRequest,
+    current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
+):
+    """
+    Doctor approves (and optionally edits) the patient-friendly visit summary.
+    Sets approval_status='approved' and notifies the patient.
+    """
+    summary = (
+        supabase.table("patient_summaries")
+        .select("*")
+        .eq("id", body.summary_id)
+        .single()
+        .execute()
+    )
+    if not summary.data:
+        raise HTTPException(status_code=404, detail="Summary not found.")
+
+    session_id = summary.data["session_id"]
+    session = (
+        supabase.table("sessions")
+        .select("doctor_id, patient_id")
+        .eq("id", session_id)
+        .single()
+        .execute()
+    )
+    if not session.data or session.data["doctor_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Apply edits first (if provided)
+    if body.edits:
+        supabase.table("patient_summaries").update(body.edits).eq("id", body.summary_id).execute()
+
+    # Approve + mark as sent
+    supabase.table("patient_summaries").update({
+        "approval_status": "approved",
+        "approved_by": current_user["id"],
+        "approved_at": now,
+        "sent_to_patient_at": now,
+        "updated_at": now,
+    }).eq("id", body.summary_id).execute()
+
+    # Notify patient (best-effort)
+    try:
+        patient_id = session.data["patient_id"]
+        supabase.table("notifications").insert({
+            "id": str(uuid.uuid4()),
+            "recipient_id": patient_id,
+            "sender_id": current_user["id"],
+            "session_id": session_id,
+            "notification_type": "patient_summary_available",
+            "title": "Visit Summary Available",
+            "body": "Your doctor has approved your visit summary. You can view it now.",
+            "payload": {"session_id": session_id},
+        }).execute()
+        await manager.send_to_user(patient_id, "NOTIFICATION", {"session_id": session_id, "type": "patient_summary_available"})
+    except Exception as e:
+        logger.warning(f"Failed to notify patient about summary approval: {e}")
+
+    return {"status": "approved", "summary_id": body.summary_id, "session_id": session_id}
+
+
+# ─── ICD Mappings ───
+
+@router.get("/icd-mappings/{session_id}", response_model=list[ICDMappingResponse])
+def get_icd_mappings(
+    session_id: str,
+    current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
+):
+    """List ICD mappings for a session (doctor only)."""
+    session = (
+        supabase.table("sessions")
+        .select("doctor_id")
+        .eq("id", session_id)
+        .single()
+        .execute()
+    )
+    if not session.data or session.data["doctor_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    result = (
+        supabase.table("icd_mappings")
+        .select("*")
+        .eq("session_id", session_id)
+        .order("created_at")
+        .execute()
+    )
+    return result.data or []
+
+
+@router.patch("/icd-mappings/{mapping_id}")
+def update_icd_mapping(
+    mapping_id: str,
+    action: str = Query(..., description="approved|rejected"),
+    current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
+):
+    """Approve/reject a single ICD mapping."""
+    if action not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Invalid action.")
+
+    mapping = (
+        supabase.table("icd_mappings")
+        .select("id, session_id")
+        .eq("id", mapping_id)
+        .single()
+        .execute()
+    )
+    if not mapping.data:
+        raise HTTPException(status_code=404, detail="Mapping not found.")
+
+    session_id = mapping.data["session_id"]
+    session = (
+        supabase.table("sessions")
+        .select("doctor_id")
+        .eq("id", session_id)
+        .single()
+        .execute()
+    )
+    if not session.data or session.data["doctor_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    result = (
+        supabase.table("icd_mappings")
+        .update({
+            "approval_status": action,
+            "approved_by": current_user["id"],
+            "approved_at": now,
+            "updated_at": now,
+        })
+        .eq("id", mapping_id)
+        .execute()
+    )
+
+    return (result.data or [{"id": mapping_id, "status": action}])[0]
+
+
+# ─── Treatment Suggestions ───
+
+@router.get("/treatments/{session_id}", response_model=list[TreatmentSuggestionResponse])
+def get_treatments(
+    session_id: str,
+    current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
+):
+    """List treatment suggestions for a session (doctor only)."""
+    session = (
+        supabase.table("sessions")
+        .select("doctor_id")
+        .eq("id", session_id)
+        .single()
+        .execute()
+    )
+    if not session.data or session.data["doctor_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    result = (
+        supabase.table("treatment_suggestions")
+        .select("*")
+        .eq("session_id", session_id)
+        .order("created_at")
+        .execute()
+    )
+    return result.data or []
+
+
+@router.post("/treatments/approve")
+def approve_treatment(
+    body: ApproveTreatmentRequest,
+    current_user: dict = Depends(require_role("doctor")),
+    supabase: Client = Depends(get_supabase),
+):
+    """Approve/reject a treatment suggestion (doctor only)."""
+    if body.action not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Invalid action.")
+
+    suggestion = (
+        supabase.table("treatment_suggestions")
+        .select("id, session_id")
+        .eq("id", body.suggestion_id)
+        .single()
+        .execute()
+    )
+    if not suggestion.data:
+        raise HTTPException(status_code=404, detail="Suggestion not found.")
+
+    session_id = suggestion.data["session_id"]
+    session = (
+        supabase.table("sessions")
+        .select("doctor_id")
+        .eq("id", session_id)
+        .single()
+        .execute()
+    )
+    if not session.data or session.data["doctor_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    update = {
+        "approval_status": body.action,
+        "approved_by": current_user["id"],
+        "approved_at": now,
+        "updated_at": now,
+    }
+    if body.doctor_notes is not None:
+        update["doctor_notes"] = body.doctor_notes
+
+    result = (
+        supabase.table("treatment_suggestions")
+        .update(update)
+        .eq("id", body.suggestion_id)
+        .execute()
+    )
+    return (result.data or [{"id": body.suggestion_id, "status": body.action}])[0]
 
 
 # ─── Pre-Session Insights ───

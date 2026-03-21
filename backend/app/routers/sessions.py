@@ -447,6 +447,20 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         )
         transcript = "\n".join(f"[{c['speaker_role']}]: {c['raw_text']}" for c in (chunks.data or []))
 
+        # Fallback: use any previously stored final transcript (e.g., from /transcribe)
+        if not transcript:
+            try:
+                ft = (
+                    supabase.table("final_transcripts")
+                    .select("full_text")
+                    .eq("session_id", session_id)
+                    .single()
+                    .execute()
+                )
+                transcript = (ft.data or {}).get("full_text") or ""
+            except Exception:
+                transcript = ""
+
         if transcript:
             try:
                 supabase.table("final_transcripts").insert({
@@ -455,7 +469,15 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
                     "total_chunks": len(chunks.data or []),
                 }).execute()
             except Exception as e:
-                logger.warning(f"Could not store final transcript: {e}")
+                # likely already exists — update instead
+                try:
+                    supabase.table("final_transcripts").update({
+                        "full_text": transcript,
+                        "total_chunks": len(chunks.data or []),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }).eq("session_id", session_id).execute()
+                except Exception as e2:
+                    logger.warning(f"Could not store final transcript: {e} / {e2}")
 
         # 2. Get recording URL
         session_info = supabase.table("sessions").select("recording_url").eq("id", session_id).single().execute()
@@ -476,6 +498,7 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
 
         # 4. Generate EMR draft (External AI Call)
         emr_content = ai_service.generate_emr_draft(
+            transcript=transcript,
             audio_url=audio_url,
             chief_complaint=chief_complaint,
             document_insights=document_insights,
@@ -514,7 +537,7 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         # 6. Map ICD Codes
         diagnoses = emr_content.get("diagnoses", [])
         if diagnoses:
-            icd_mappings = ai_service.map_icd_codes(diagnoses, audio_url=audio_url)
+            icd_mappings = ai_service.map_icd_codes(diagnoses, transcript=transcript, audio_url=audio_url)
             for mapping in icd_mappings:
                 try:
                     supabase.table("icd_mappings").insert({
@@ -534,6 +557,7 @@ async def run_ai_pipeline(session_id: str, doctor_id: str, chief_complaint: str,
         # 7. Treatment Suggestions
         treatments = ai_service.suggest_treatments(
             diagnoses=diagnoses,
+            transcript=transcript,
             audio_url=audio_url,
             current_medications=emr_content.get("medications"),
         )
@@ -911,6 +935,40 @@ async def transcribe_audio(
         except Exception as api_err:
             logger.error(f"Failed to call external transcribe API: {api_err}")
             external_resp = {"error": str(api_err)}
+
+        # If we got transcription text back, persist it so the AI pipeline can run end-to-end.
+        try:
+            transcription = None
+            if isinstance(external_resp, dict):
+                transcription = external_resp.get("transcription") or external_resp.get("text")
+            if transcription:
+                # store a single transcript chunk (index 0) and final transcript (upsert-ish)
+                try:
+                    supabase.table("transcript_chunks").insert({
+                        "session_id": session_id,
+                        "chunk_index": 0,
+                        "speaker_role": "unknown",
+                        "raw_text": transcription,
+                        "start_time_ms": 0,
+                        "end_time_ms": 0,
+                        "is_final": True,
+                    }).execute()
+                except Exception:
+                    pass
+                try:
+                    supabase.table("final_transcripts").insert({
+                        "session_id": session_id,
+                        "full_text": transcription,
+                        "total_chunks": 1,
+                    }).execute()
+                except Exception:
+                    supabase.table("final_transcripts").update({
+                        "full_text": transcription,
+                        "total_chunks": 1,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }).eq("session_id", session_id).execute()
+        except Exception as e:
+            logger.warning(f"Failed to persist transcription: {e}")
 
         return {"status": "success", "recording_url": recording_url, "session_id": session_id, "external_analysis": external_resp}
 

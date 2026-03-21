@@ -20,7 +20,7 @@ import PatientDashboard from "./pages/patient/PatientDashboard.jsx";
 import PatientProfile from "./pages/patient/PatientProfilePage.jsx";  
 import Home from "./pages/Home.jsx";
 import IndividualSession from "./pages/doctor/IndividualSession";
-import IndividualSessionSummary from "./pages/patient/IndividualSession";
+import PatientSessionPage from "./features/patient-dashboard/PatientSessionPage";
 import PatientCall from "./pages/patient/PatientCallPage.jsx";
 import Uploads from "./pages/patient/Uploads";
 import PatientAllSessions from "./pages/patient/Sessions.jsx";
@@ -90,9 +90,11 @@ export default function AppRouter() {
       <Route
         path="/doctor/session/:sessionId"
         element={
-          <ProtectedDoctorRoute>
-            <IndividualSession />
-          </ProtectedDoctorRoute>
+          <DefaultLayout>
+            <ProtectedDoctorRoute>
+              <IndividualSession />
+            </ProtectedDoctorRoute>
+          </DefaultLayout>
         }
       />
       <Route
@@ -108,17 +110,21 @@ export default function AppRouter() {
       <Route
         path="/doctor/review/:sessionId"
         element={
-          <ProtectedDoctorRoute>
-            <PostSessionReview />
-          </ProtectedDoctorRoute>
+          <DefaultLayout>
+            <ProtectedDoctorRoute>
+              <PostSessionReview />
+            </ProtectedDoctorRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/doctor/profile"
         element={
-          <ProtectedDoctorRoute>
-            <DoctorProfile />
-          </ProtectedDoctorRoute>
+          <DefaultLayout>
+            <ProtectedDoctorRoute>
+              <DoctorProfile />
+            </ProtectedDoctorRoute>
+          </DefaultLayout>
         }
       />
       {/* Patient Routes
@@ -134,49 +140,61 @@ export default function AppRouter() {
       <Route
         path="/patient/dashboard"
         element={
-          <ProtectedPatientRoute>
-            <PatientDashboard />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientDashboard />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/call/:sessionId"
         element={
-          <ProtectedPatientRoute>
-            <PatientCall />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientCall />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/sessions"
         element={
-          <ProtectedPatientRoute>
-            <PatientAllSessions />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientAllSessions />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/session/:sessionId"
         element={
-          <ProtectedPatientRoute>
-            <IndividualSessionSummary />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientSessionPage />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/uploads"
         element={
-          <ProtectedPatientRoute>
-            <Uploads />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <Uploads />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/profile"
         element={
-          <ProtectedPatientRoute>
-            <PatientProfile />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientProfile />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
 

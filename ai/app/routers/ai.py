@@ -13,13 +13,17 @@ import boto3
 from urllib.parse import urlparse
 
 
-from app import models
-from app.db import get_db
-from sqlalchemy.orm import Session
-
 from app.utils import search_icd_code
 from ..schemas import (
-    LabReportRequest, LabReportSummaryResponse, EMRRequest, EMRResponse, LabReportJSONResponse
+    LabReportRequest,
+    LabReportSummaryResponse,
+    LabReportJSONResponse,
+    EMRRequest,
+    EMRResponse,
+    MapICDRequest,
+    SuggestTreatmentsRequest,
+    GenerateSummaryRequest,
+    LiveInsightRequest,
 )
 
 from ..config import Settings
@@ -247,33 +251,37 @@ def generate_emr(
         schema = {
             "type": "object",
             "properties": {
-                "patient_name": {"type": "string"},
-                "age": {"type": "integer"},
-                "gender": {"type": "string"},
                 "chief_complaint": {"type": "string"},
-                "history_of_present_illness": {"type": "string"},
+                "history_present_illness": {"type": "string"},
                 "past_medical_history": {"type": "array", "items": {"type": "string"}},
                 "medications": {"type": "array", "items": {"type": "string"}},
                 "allergies": {"type": "array", "items": {"type": "string"}},
+                "vital_signs": {"type": "object"},
+                "review_of_systems": {"type": "array", "items": {"type": "string"}},
                 "physical_examination": {"type": "string"},
                 "assessment": {"type": "string"},
-                "plan": {"type": "array", "items": {"type": "string"}},
-                "follow_up": {"type": "string"}
+                "diagnoses": {"type": "array", "items": {"type": "string"}},
+                "treatment_plan": {"type": "array", "items": {"type": "string"}},
+                "medications_prescribed": {"type": "array", "items": {"type": "string"}},
+                "follow_up_plan": {"type": "string"},
+                "patient_instructions": {"type": "string"}
             },
             "required": [
                 "chief_complaint",
-                "history_of_present_illness",
+                "history_present_illness",
                 "assessment"
             ]
         }
 
-        report_summaries_text = "\n".join([f"- {s}" for s in req.report_summaries])
+        report_summaries_text = "\n".join([f"- {s}" for s in (req.report_summaries or [])])
         
         prompt = f"""
-        You are an expert medical scribe and consultant. Based on the following transcribed conversation between a doctor and a patient, and the provided lab report summaries, generate a comprehensive and structured Electronic Medical Record (EMR).
-        Ensure medical accuracy and a professional tone.
+        You are an expert medical scribe. Generate a structured EMR JSON for a doctor to review.
+        Keep it concise but clinically complete and medically accurate.
 
-        Conversation:
+        Chief Complaint (if provided): {req.chief_complaint or ""}
+
+        Conversation Transcript:
         {req.conversation}
 
         Lab Report Summaries:
@@ -296,12 +304,193 @@ def generate_emr(
             raise ValueError("Empty response from GenAI")
 
         emr_data = json.loads(response.text)
-        icd10_results = search_icd_code(emr_data.get("assessment", ""))
-        emr_data["icd10_codes"] = [f"{r['code']} - {r['short_description']}" for r in icd10_results]
+        emr_data["model_used"] = "gemini-2.0-flash-lite"
         return emr_data
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating EMR: {str(e)}")
+
+
+@router.post("/map-icd")
+def map_icd(req: MapICDRequest):
+    """
+    Lightweight ICD mapping using bundled diagnosis.csv lookup.
+    Returns a list of mapping objects compatible with backend expectations.
+    """
+    mappings = []
+    diagnoses = req.diagnoses or []
+    for idx, d in enumerate(diagnoses):
+        if isinstance(d, dict):
+            text = d.get("diagnosis_text") or d.get("description") or d.get("diagnosis") or ""
+        else:
+            text = str(d or "")
+        text = text.strip()
+        if not text:
+            continue
+        match = search_icd_code(text, max_results=1)
+        if match:
+            m = match[0]
+            mappings.append({
+                "diagnosis_text": text,
+                "icd_code": m.get("code"),
+                "icd_description": m.get("short_description") or m.get("long_description"),
+                "confidence_score": 0.65,
+                "is_primary": idx == 0,
+            })
+        else:
+            mappings.append({
+                "diagnosis_text": text,
+                "icd_code": None,
+                "icd_description": None,
+                "confidence_score": 0.0,
+                "is_primary": idx == 0,
+            })
+    return mappings
+
+
+@router.post("/suggest-treatments")
+def suggest_treatments(
+    req: SuggestTreatmentsRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Treatment suggestions via Gemini. Returns a JSON array of suggestions.
+    """
+    if not settings.GOOGLE_API_KEY:
+        return []
+
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+    schema = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "suggestion_type": {"type": "string"},
+                "title": {"type": "string"},
+                "description": {"type": "string"},
+                "rationale": {"type": "string"},
+                "evidence_basis": {"type": "string"},
+                "priority": {"type": "string"},
+                "contraindications": {"type": "string"},
+            },
+            "required": ["title"],
+        },
+    }
+
+    prompt = f"""
+    You are a careful clinical decision support assistant. Suggest evidence-based treatments for the diagnoses.
+    Return 3-8 items. Avoid unsafe advice, include contraindications when relevant, and be concise.
+
+    Diagnoses: {json.dumps(req.diagnoses or [])}
+    Current medications: {json.dumps(req.current_medications or [])}
+    Transcript (optional context): {req.conversation or ""}
+    """
+
+    config = types.GenerateContentConfig(
+        temperature=0.2,
+        response_mime_type="application/json",
+        response_schema=schema,
+    )
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-lite",
+        contents=[prompt],
+        config=config,
+    )
+    if not response or not response.text:
+        return []
+    return json.loads(response.text)
+
+
+@router.post("/generate-summary")
+def generate_summary(
+    req: GenerateSummaryRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """Generate a patient-friendly visit summary."""
+    if not settings.GOOGLE_API_KEY:
+        return {
+            "summary_text": "Your session summary is being processed. Please check back later.",
+            "key_takeaways": [],
+            "medications_list": [],
+            "follow_up_notes": "",
+            "warnings": [],
+        }
+
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+    schema = {
+        "type": "object",
+        "properties": {
+            "summary_text": {"type": "string"},
+            "key_takeaways": {"type": "array", "items": {"type": "string"}},
+            "medications_list": {"type": "array", "items": {"type": "string"}},
+            "follow_up_notes": {"type": "string"},
+            "warnings": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["summary_text"],
+    }
+
+    prompt = f"""
+    You are a patient education assistant. Write a clear, plain-language visit summary.
+    Use short sentences and bullet-like items where helpful. Do not include PHI beyond what's provided.
+
+    EMR content: {json.dumps(req.emr_content or {})}
+    Diagnoses: {json.dumps(req.diagnoses or [])}
+    Treatments: {json.dumps(req.treatments or [])}
+    """
+
+    config = types.GenerateContentConfig(
+        temperature=0.2,
+        response_mime_type="application/json",
+        response_schema=schema,
+    )
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-lite",
+        contents=[prompt],
+        config=config,
+    )
+    if not response or not response.text:
+        return {"summary_text": "Summary unavailable.", "key_takeaways": [], "medications_list": [], "follow_up_notes": "", "warnings": []}
+    return json.loads(response.text)
+
+
+@router.post("/live-insight")
+def live_insight(
+    req: LiveInsightRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """Return a short real-time clinical insight string."""
+    if not settings.GOOGLE_API_KEY:
+        return {"insight": "Live insights are not available right now."}
+
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+    schema = {
+        "type": "object",
+        "properties": {"insight": {"type": "string"}},
+        "required": ["insight"],
+    }
+    prompt = f"""
+    You are a clinical assistant. Given the transcript, output ONE short insight:
+    - possible red flags
+    - missing key questions
+    - medication/allergy safety checks
+    Keep it under 3 sentences.
+
+    Transcript:
+    {req.transcript}
+    """
+    config = types.GenerateContentConfig(
+        temperature=0.2,
+        response_mime_type="application/json",
+        response_schema=schema,
+    )
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-lite",
+        contents=[prompt],
+        config=config,
+    )
+    if not response or not response.text:
+        return {"insight": "No insight generated."}
+    return json.loads(response.text)
 
 
 def generate_emr_pdf(emr_data: dict) -> bytes:
@@ -513,5 +702,3 @@ def generate_emr_pdf_endpoint(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating EMR PDF: {str(e)}")
-
-

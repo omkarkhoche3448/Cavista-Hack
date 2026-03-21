@@ -8,6 +8,7 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 BASE_URL = settings.ANALYSIS_API_URL
+_session = requests.Session()
 
 
 def _call(endpoint: str, payload: dict):
@@ -24,25 +25,28 @@ def _call(endpoint: str, payload: dict):
     Returns:
         dict | list | None: Parsed JSON response if 200 OK, else None.
     """
+    if not BASE_URL:
+        logger.warning("ANALYSIS_API_URL is not set; skipping AI call to %s", endpoint)
+        return None
     try:
         url = f"{BASE_URL}{endpoint}"
-        print(f"[AI_SERVICE] POST {url}")
-        resp = requests.post(url, json=payload, timeout=90)
-        print(f"[AI_SERVICE] Response {resp.status_code}")
+        logger.info("[AI_SERVICE] POST %s", url)
+        resp = _session.post(url, json=payload, timeout=90)
+        logger.info("[AI_SERVICE] Response %s", resp.status_code)
         if resp.status_code == 200:
             return resp.json()
         elif resp.status_code == 404:
-            print(f"[AI_SERVICE] 404: {url} — skipping.")
+            logger.warning("[AI_SERVICE] 404: %s — skipping", url)
             return None
         else:
-            print(f"[AI_SERVICE] Error ({resp.status_code}): {resp.text}")
+            logger.warning("[AI_SERVICE] Error (%s): %s", resp.status_code, resp.text[:500])
             return None
     except Exception as e:
-        print(f"[AI_SERVICE] Connection failed: {e}")
+        logger.warning("[AI_SERVICE] Connection failed: %s", e)
         return None
 
 
-def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_url: str = None) -> dict:
+def generate_emr_draft(*, transcript: str = "", chief_complaint: str = "", document_insights=None, audio_url: str | None = None) -> dict:
     """
     Requests the external AI to generate a structured EMR draft from session data.
     
@@ -58,7 +62,7 @@ def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_
         dict: A structured EMR object with HPI, Assessment, Plan, etc.
     """
     payload = {
-        "conversation": audio_url or "",
+        "conversation": transcript or (audio_url or ""),
         "chief_complaint": chief_complaint,
         "report_summaries": document_insights or [],
     }
@@ -72,7 +76,7 @@ def generate_emr_draft(chief_complaint: str = "", document_insights=None, audio_
     }
 
 
-def map_icd_codes(diagnoses: list, audio_url: str = None) -> list:
+def map_icd_codes(diagnoses: list, *, transcript: str = "", audio_url: str | None = None) -> list:
     """
     Suggests ICD-10 medical codes for a list of clinical diagnoses.
     
@@ -88,11 +92,11 @@ def map_icd_codes(diagnoses: list, audio_url: str = None) -> list:
     """
     if not diagnoses:
         return []
-    result = _call("/ai/map-icd", {"diagnoses": diagnoses, "conversation": audio_url})
+    result = _call("/ai/map-icd", {"diagnoses": diagnoses, "conversation": transcript or (audio_url or "")})
     return result or []
 
 
-def suggest_treatments(diagnoses: list, current_medications=None, audio_url: str = None) -> list:
+def suggest_treatments(diagnoses: list, *, current_medications=None, transcript: str = "", audio_url: str | None = None) -> list:
     """
     Generates evidence-based treatment suggestions based on diagnoses.
     
@@ -111,7 +115,7 @@ def suggest_treatments(diagnoses: list, current_medications=None, audio_url: str
         return []
     result = _call("/ai/suggest-treatments", {
         "diagnoses": diagnoses,
-        "conversation": audio_url,
+        "conversation": transcript or (audio_url or ""),
         "current_medications": current_medications,
     })
     return result or []

@@ -6,16 +6,21 @@ from .routers import sessions
 from .routers import documents
 from .routers import emr
 from .routers import notes
+from .config import settings
 
 app = FastAPI(title="SEVAमित्र API", version="1.0.0")
 
+default_origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+]
+env_origins = [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
+allow_origins = env_origins or default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

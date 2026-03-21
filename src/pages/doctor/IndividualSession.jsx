@@ -18,24 +18,45 @@ import {
   Stethoscope,
   Activity,
 } from "lucide-react";
-import { getSession, startSession, endSession, transcribeAudio } from "@/services/sessionService";
+import { getSession, startSession, endSession, transcribeAudio, getTranscript } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+
+const STATUS_BADGE = {
+  pending: { label: "Pending", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  accepted: { label: "Accepted", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  active: { label: "Active", className: "bg-primary/10 text-primary border-primary/20" },
+  ended: { label: "Ended", className: "bg-muted text-muted-foreground border-border" },
+  processing: { label: "Processing", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  completed: { label: "Completed", className: "bg-green-100 text-green-700 border-green-200" },
+  rejected: { label: "Rejected", className: "bg-red-100 text-red-700 border-red-200" },
+};
+
+const WAVE_HEIGHTS = [35, 70, 45, 85, 50, 80, 55, 90, 60, 75, 40, 65, 52, 88, 46];
+
+function toArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") return value.trim() ? [value] : [];
+  return [value];
+}
 
 export default function IndividualSession() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { session: authSession } = useAuth();
-  const { subscribe } = useWebSocket();
+  const { subscribe, send } = useWebSocket();
   const token = authSession?.access_token;
 
   const [sessionData, setSessionData] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [insights, setInsights] = useState([]);
   const [aiInsight, setAiInsight] = useState(null);
+  const [transcript, setTranscript] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [requestingInsight, setRequestingInsight] = useState(false);
   const [loading, setLoading] = useState(true);
   const [duration, setDuration] = useState(0);
 
@@ -50,14 +71,16 @@ export default function IndividualSession() {
     async function load() {
       if (!token || !sessionId) return;
       try {
-        const [sess, docs, ins] = await Promise.all([
+        const [sess, docs, ins, tr] = await Promise.all([
           getSession(token, sessionId),
           getSessionDocuments(token, sessionId).catch(() => []),
           getInsights(token, sessionId).catch(() => []),
+          getTranscript(token, sessionId).catch(() => []),
         ]);
         setSessionData(sess);
         setDocuments(docs);
         setInsights(ins);
+        setTranscript(Array.isArray(tr) ? tr : []);
       } catch (err) {
         console.error("Failed to load session:", err);
       } finally {
@@ -116,14 +139,25 @@ export default function IndividualSession() {
       }
     });
 
-    return () => { unsub1(); unsub2(); unsub3(); };
+    const unsub4 = subscribe("TRANSCRIPT_CHUNK", (data) => {
+      if (data.session_id !== sessionId) return;
+      setTranscript((prev) => {
+        const chunkIndex = data.chunk_index ?? data.chunkIndex ?? 0;
+        if (prev.some((c) => (c.chunk_index ?? c.chunkIndex) === chunkIndex)) return prev;
+        return [...prev, { ...data, chunk_index: chunkIndex }].sort((a, b) => (a.chunk_index ?? 0) - (b.chunk_index ?? 0));
+      });
+    });
+
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
   }, [subscribe, sessionId, navigate]);
 
   // Start mic audio recording only
   const startRecording = useCallback(async () => {
     try {
-      await startSession(token, sessionId);
-      setSessionData(prev => ({ ...prev, status: "active" }));
+      if (sessionData?.status !== "active") {
+        await startSession(token, sessionId);
+        setSessionData((prev) => ({ ...prev, status: "active" }));
+      }
       await startAudioRecording();
       setIsRecording(true);
     } catch (err) {
@@ -132,7 +166,7 @@ export default function IndividualSession() {
         alert("Microphone access denied. Please allow microphone access.");
       }
     }
-  }, [token, sessionId, startAudioRecording]);
+  }, [token, sessionId, startAudioRecording, sessionData?.status]);
 
   // Pause mic audio recording
   const stopRecording = useCallback(() => {
@@ -165,6 +199,17 @@ export default function IndividualSession() {
     }
   }
 
+  async function handleRequestInsight() {
+    if (!sessionId) return;
+    setRequestingInsight(true);
+    try {
+      send("REQUEST_AI_INSIGHT", { session_id: sessionId });
+    } finally {
+      // give the server a moment to respond; this is purely UI polish
+      setTimeout(() => setRequestingInsight(false), 600);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -181,13 +226,91 @@ export default function IndividualSession() {
     );
   }
 
+  const statusCfg = STATUS_BADGE[sessionData.status] ?? {
+    label: sessionData.status || "—",
+    className: "bg-muted text-muted-foreground border-border",
+  };
+
   return (
-    <div className="flex gap-4 h-[calc(100vh-10rem)]">
-      {/* Left Sidebar — Documents */}
-      <div className="w-80 flex-shrink-0 flex flex-col gap-4 animate-in slide-in-from-left duration-500">
+    <div className="flex flex-col gap-6 min-h-[calc(100vh-10rem)] p-4 lg:p-6">
+      {/* Session Header - Full Width */}
+      <div className="bg-card p-4 lg:p-6 rounded-xl border shadow-card">
+        <div className="flex gap-3 z-20 flex-col">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                <User className="w-6 h-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg lg:text-xl font-bold font-heading whitespace-nowrap">
+                    {sessionData.patient_name}
+                  </h2>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0 ${statusCfg.className}`}>
+                    {statusCfg.label}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Duration + Buttons */}
+            <div className="flex items-center gap-3 lg:gap-4 flex-wrap justify-end sm:flex-nowrap flex-shrink-0">
+              <div className="flex flex-col items-end">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest leading-tight">Duration</p>
+                <p className="text-lg lg:text-2xl font-mono font-bold text-primary">{formatDuration(duration)}</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {(sessionData.status === "accepted" || sessionData.status === "active") && !isRecording && (
+                  <Button onClick={startRecording} variant="hero" className="gap-2 rounded-xl text-xs lg:text-sm py-2">
+                    <Mic className="w-4 h-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">{sessionData.status === "active" ? "Resume" : "Start"}</span>
+                  </Button>
+                )}
+                {isRecording && (
+                  <Button
+                    onClick={stopRecording}
+                    variant="outline"
+                    className="gap-2 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5 transition-all text-xs lg:text-sm py-2"
+                  >
+                    <MicOff className="w-4 h-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Pause</span>
+                  </Button>
+                )}
+                <Button
+                  onClick={handleEndSession}
+                  variant="destructive"
+                  disabled={isEnding}
+                  className="gap-2 rounded-xl text-xs lg:text-sm py-2"
+                >
+                  {isEnding ? (
+                    <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                  ) : (
+                    <StopCircle className="w-4 h-4 flex-shrink-0" />
+                  )}
+                  <span className="hidden sm:inline">{isEnding ? "Processing..." : "Finish"}</span>
+                  <span className="sm:hidden">{isEnding ? "..." : "End"}</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Row: Chief Complaint */}
+          <p className="text-xs lg:text-sm text-muted-foreground flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 flex-shrink-0 text-primary" />
+            <span className="truncate">{sessionData.chief_complaint || "General consultation"}</span>
+          </p>
+        </div>
+      </div>
+
+      {/* 3-Column Layout Below Header */}
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr_320px] gap-6 flex-1">
+        {/* Left Sidebar — Documents */}
+
+        <div className="flex flex-col gap-6 animate-in slide-in-from-left duration-500 min-w-0">
         <Card className="flex-1 overflow-hidden flex flex-col border-primary/10 shadow-sm bg-card/50 backdrop-blur-sm">
-          <CardHeader className="pb-3 border-b bg-muted/30">
-            <CardTitle className="text-sm flex items-center justify-between">
+          <CardHeader className="pb-2 lg:pb-3 border-b bg-muted/30 px-3 lg:px-4 py-2 lg:py-3">
+            <CardTitle className="text-xs lg:text-sm flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-primary" />
                 Clinical Registry
@@ -197,7 +320,7 @@ export default function IndividualSession() {
               </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
+          <CardContent className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-2 lg:space-y-3">
             {documents.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-40">
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
@@ -236,10 +359,10 @@ export default function IndividualSession() {
                       {doc.analysis_result.summary && (
                         <p className="text-muted-foreground">{doc.analysis_result.summary}</p>
                       )}
-                      {doc.analysis_result.key_findings?.length > 0 && (
+                      {toArray(doc.analysis_result.key_findings).length > 0 && (
                         <div>
                           <p className="font-medium mb-0.5">Key Findings:</p>
-                          {doc.analysis_result.key_findings.map((f, fi) => (
+                          {toArray(doc.analysis_result.key_findings).map((f, fi) => (
                             <div key={fi} className="flex items-start gap-1 ml-1">
                               <ChevronRight className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
                               <span className="text-muted-foreground">{typeof f === "string" ? f : f.finding || f.value || JSON.stringify(f)}</span>
@@ -247,10 +370,10 @@ export default function IndividualSession() {
                           ))}
                         </div>
                       )}
-                      {doc.analysis_result.recommendations?.length > 0 && (
+                      {toArray(doc.analysis_result.recommendations).length > 0 && (
                         <div>
                           <p className="font-medium mb-0.5">Recommendations:</p>
-                          {doc.analysis_result.recommendations.map((r, ri) => (
+                          {toArray(doc.analysis_result.recommendations).map((r, ri) => (
                             <div key={ri} className="flex items-start gap-1 ml-1">
                               <ChevronRight className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
                               <span className="text-muted-foreground">{typeof r === "string" ? r : r.recommendation || JSON.stringify(r)}</span>
@@ -258,10 +381,10 @@ export default function IndividualSession() {
                           ))}
                         </div>
                       )}
-                      {doc.analysis_result.risk_flags?.length > 0 && (
+                      {toArray(doc.analysis_result.risk_flags).length > 0 && (
                         <div>
                           <p className="font-medium mb-0.5">Risk Flags:</p>
-                          {doc.analysis_result.risk_flags.map((flag, fi) => (
+                          {toArray(doc.analysis_result.risk_flags).map((flag, fi) => (
                             <div key={fi} className="flex items-center gap-1 ml-1">
                               <AlertTriangle className="w-3 h-3 text-yellow-500 flex-shrink-0" />
                               <span className="text-muted-foreground">{typeof flag === "string" ? flag : flag.flag || JSON.stringify(flag)}</span>
@@ -310,156 +433,111 @@ export default function IndividualSession() {
       </div>
 
       {/* Center — Transcript */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Session Header */}
-        <div className="flex items-center justify-between mb-6 bg-card p-4 rounded-xl border shadow-card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <User className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold font-heading">
-                  {sessionData.patient_name}
-                </h2>
-                <Badge variant="success" className="animate-pulse">Active</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Stethoscope className="w-3 h-3" />
-                {sessionData.chief_complaint || "General consultation"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="text-right mr-4 hidden sm:block">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Duration</p>
-              <p className="text-2xl font-mono font-bold text-primary">{formatDuration(duration)}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {sessionData.status === "accepted" && !isRecording && (
-                <Button onClick={startRecording} variant="hero" className="gap-2 rounded-xl">
-                  <Mic className="w-4 h-4" />
-                  Start Recording
-                </Button>
-              )}
-              {isRecording && (
-                <Button
-                  onClick={stopRecording}
-                  variant="outline"
-                  className="gap-2 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5 transition-all"
-                >
-                  <MicOff className="w-4 h-4" />
-                  Pause
-                </Button>
-              )}
-              <Button
-                onClick={handleEndSession}
-                variant="destructive"
-                disabled={isEnding}
-                className="gap-2 rounded-xl"
-              >
-                {isEnding ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <StopCircle className="w-4 h-4" />
-                )}
-                {isEnding ? "Processing..." : "Finish"}
-              </Button>
-            </div>
-          </div>
-        </div>
-
+      <div className="flex flex-col min-w-0 gap-6">
         {/* Recording Indicator */}
         {isRecording && (
-          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-xl">
+          <div className="flex items-center gap-2 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-xl">
             <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-            <span className="text-sm text-destructive font-medium">
+            <span className="text-xs lg:text-sm text-destructive font-medium">
               Recording — speak clearly into your microphone
             </span>
           </div>
         )}
 
         {/* Transcript Area */}
-        <Card className="flex-1 overflow-hidden flex flex-col relative group border-none shadow-none bg-transparent">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/5 pointer-events-none opacity-50" />
-
-          <CardHeader className="pb-2 bg-background/50 backdrop-blur-sm border-b relative z-10">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary" />
-              Intelligence Core
-            </CardTitle>
+        <Card className="flex-1 overflow-hidden flex flex-col border shadow-card bg-card/50 backdrop-blur-sm">
+          <CardHeader className="pb-2 lg:pb-3 border-b bg-muted/30 px-3 lg:px-4 py-2 lg:py-3">
+            <div className="flex items-center justify-between gap-2 lg:gap-3">
+              <CardTitle className="text-xs lg:text-sm flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary flex-shrink-0" />
+                <span className="truncate">Live Transcript</span>
+              </CardTitle>
+              <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={handleRequestInsight}
+                  disabled={requestingInsight}
+                  title="Ask the assistant for a quick clinical insight"
+                >
+                  {requestingInsight ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+                </Button>
+                <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0 flex-shrink-0">
+                  {transcript.length}
+                </Badge>
+              </div>
+            </div>
           </CardHeader>
 
-          <CardContent className="flex-1 flex flex-col items-center justify-center space-y-8 relative z-10">
-            {isRecording ? (
-              <>
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-75" />
-                  <div className="absolute inset-[-20px] rounded-full border border-primary/20 animate-[spin_4s_linear_infinite]" />
-                  <div className="absolute inset-[-40px] rounded-full border border-primary/10 animate-[spin_8s_linear_infinite_reverse]" />
-
-                  <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary shadow-inner border border-primary/20">
-                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse" />
-                    <Mic className="w-12 h-12 relative z-10" />
-                  </div>
+          <CardContent className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-2 lg:space-y-3">
+            {isRecording && (
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+                  <p className="text-sm font-semibold">Recording</p>
+                  <p className="text-sm text-muted-foreground">Audio will be transcribed after you finish.</p>
                 </div>
-
-                {/* Animated Waveform Blocks */}
-                <div className="flex items-end gap-1 h-8">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(i => (
+                <div className="mt-3 flex items-end gap-1 h-8">
+                  {WAVE_HEIGHTS.map((h, idx) => (
                     <div
-                      key={i}
+                      key={idx}
                       className="w-1.5 bg-primary/40 rounded-full animate-waveform"
                       style={{
-                        height: `${20 + Math.random() * 80}%`,
-                        animationDelay: `${i * 0.1}s`,
-                        opacity: 0.3 + (i / 15) * 0.7
+                        height: `${h}%`,
+                        animationDelay: `${idx * 0.1}s`,
+                        opacity: 0.25 + (idx / WAVE_HEIGHTS.length) * 0.7,
                       }}
                     />
                   ))}
                 </div>
-
-                <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-bold font-heading text-foreground">Listening...</h3>
-                  <p className="text-muted-foreground max-w-sm mx-auto font-medium leading-relaxed">
-                    SEVAमित्र is capturing and processing clinical audio in real-time. Full EMR draft will be available upon completion.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center space-y-6">
-                <div className="w-24 h-24 rounded-3xl bg-muted/50 flex items-center justify-center text-muted-foreground border border-border group-hover:border-primary/20 transition-colors duration-500">
-                  <Mic className="w-10 h-10 opacity-20" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold font-heading text-muted-foreground">Ready for Consultation</h3>
-                  <p className="text-sm text-muted-foreground/60 max-w-[240px]">
-                    Click the "Start Recording" button to begin the clinical session.
-                  </p>
-                </div>
               </div>
+            )}
+
+            {transcript.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-12 space-y-3 text-muted-foreground">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                  <Mic className="w-6 h-6 opacity-50" />
+                </div>
+                <p className="font-semibold">No transcript yet</p>
+                <p className="text-sm max-w-sm">
+                  During the session you’ll see transcript chunks here (if streaming is enabled). After finishing, transcription is stored automatically.
+                </p>
+              </div>
+            ) : (
+              transcript.map((c, idx) => (
+                <div key={c.id || `${c.chunk_index}-${idx}`} className="p-3 rounded-xl border bg-background/50">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5">
+                      {c.speaker_role || "unknown"}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      #{c.chunk_index ?? idx}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{c.text || c.raw_text || ""}</p>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
       </div>
 
       {/* Right Sidebar — AI Assistant */}
-      <div className="w-80 flex-shrink-0 flex flex-col animate-in slide-in-from-right duration-500">
+      <div className="flex flex-col animate-in slide-in-from-right duration-500 min-w-0">
         <Card className="flex-1 overflow-hidden flex flex-col border-primary/10 shadow-sm bg-card/50 backdrop-blur-sm">
-          <CardHeader className="pb-3 border-b bg-muted/30">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <div className="relative">
+          <CardHeader className="pb-2 lg:pb-3 border-b bg-muted/30 px-3 lg:px-4 py-2 lg:py-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-xs lg:text-sm flex items-center gap-2">
+                <div className="relative flex-shrink-0">
                   <Brain className="w-4 h-4 text-primary" />
                   <div className="absolute inset-0 bg-primary animate-ping opacity-20" />
                 </div>
-                Assistant Core
+                <span className="truncate">Assistant Core</span>
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto p-3 space-y-4">
+          <CardContent className="flex-1 overflow-y-auto p-2 lg:p-3 space-y-3 lg:space-y-4">
             {!aiInsight ? (
               <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-40">
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
@@ -469,6 +547,12 @@ export default function IndividualSession() {
               </div>
             ) : (
               <div className="space-y-5 animate-in fade-in duration-500">
+                {typeof aiInsight === "string" && (
+                  <div className="p-3 rounded-xl border bg-background/50 space-y-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Insight</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{aiInsight}</p>
+                  </div>
+                )}
                 {aiInsight.key_observations?.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Key Observations</p>
@@ -534,6 +618,7 @@ export default function IndividualSession() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   );
 }

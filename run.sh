@@ -8,6 +8,8 @@ set -e
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 VENV_DIR="$BACKEND_DIR/venv"
+AI_DIR="$ROOT_DIR/ai"
+AI_VENV_DIR="$AI_DIR/venv"
 
 # Colors
 GREEN='\033[0;32m'
@@ -43,14 +45,15 @@ npm install
 echo ""
 echo -e "${CYAN}▶ Starting backend (uvicorn) and frontend (vite)...${NC}"
 echo -e "${GREEN}  Backend  → http://localhost:8000${NC}"
+echo -e "${GREEN}  AI       → http://localhost:8001${NC}"
 echo -e "${GREEN}  Frontend → http://localhost:5173${NC}"
 echo ""
 
 # Trap to kill both processes on exit
 cleanup() {
     echo -e "\n${CYAN}Shutting down...${NC}"
-    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
-    wait $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    kill $BACKEND_PID $AI_PID $FRONTEND_PID 2>/dev/null
+    wait $BACKEND_PID $AI_PID $FRONTEND_PID 2>/dev/null
     exit 0
 }
 trap cleanup SIGINT SIGTERM
@@ -60,6 +63,24 @@ cd "$BACKEND_DIR"
 source "$VENV_DIR/bin/activate"
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
+
+# Start AI (optional heavy deps; disable by setting START_AI=0)
+START_AI="${START_AI:-1}"
+if [ "$START_AI" = "1" ]; then
+  echo -e "${CYAN}▶ Starting AI service...${NC}"
+  if [ ! -d "$AI_VENV_DIR" ]; then
+      echo -e "${GREEN}  Creating AI virtual environment...${NC}"
+      python3 -m venv "$AI_VENV_DIR"
+  fi
+  source "$AI_VENV_DIR/bin/activate"
+  pip install --upgrade pip -q
+  pip install -r "$AI_DIR/requirements.txt" -q
+  cd "$AI_DIR"
+  uvicorn app.main:app --reload --host 0.0.0.0 --port 8001 &
+  AI_PID=$!
+else
+  AI_PID=""
+fi
 
 # Start frontend
 cd "$ROOT_DIR"

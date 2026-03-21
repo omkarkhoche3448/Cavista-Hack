@@ -59,8 +59,8 @@ export default function PatientAllSessions() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold font-heading text-foreground">Patient Sessions</h1>
-        <p className="text-muted-foreground mt-1">Overview of all your recent and upcoming patient sessions.</p>
+        <h1 className="text-2xl font-bold font-heading text-foreground">Your Sessions</h1>
+        <p className="text-muted-foreground mt-1">Overview of your recent and upcoming appointments.</p>
       </div>
 
       {error && (
@@ -74,8 +74,8 @@ export default function PatientAllSessions() {
           <thead>
             <tr className="border-b bg-muted/40">
               <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Session ID</th>
-              <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Patient</th>
-              <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</th>
+              <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Doctor</th>
+              <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Doctor Email</th>
               <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
               <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Time</th>
               <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
@@ -117,10 +117,10 @@ export default function PatientAllSessions() {
                       {formatSessionId(session.id)}
                     </td>
                     <td className="px-5 py-4 text-foreground">
-                      {session.patient_name ?? "—"}
+                      {session.doctor_name ?? "—"}
                     </td>
                     <td className="px-5 py-4 text-primary">
-                      {session.patient_email ?? "—"}
+                      {session.doctor_email ?? "—"}
                     </td>
                     <td className="px-5 py-4 text-foreground">
                       {session.created_at ? formatDate(session.created_at) : "—"}

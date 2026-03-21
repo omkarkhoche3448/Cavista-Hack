@@ -1,6 +1,8 @@
 import { Mic, FileText, Stethoscope, Brain, AlertTriangle, ClipboardCheck } from "lucide-react";
 import { motion } from "framer-motion";
 
+const MotionDiv = motion.div;
+
 const features = [
   {
     icon: Mic,
@@ -38,7 +40,7 @@ const FeaturesSection = () => {
   return (
     <section className="py-24 px-6">
       <div className="container max-w-6xl mx-auto">
-        <motion.div
+        <MotionDiv
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -54,11 +56,11 @@ const FeaturesSection = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
             From live consultation to finalized medical record — SEVAमित्र automates the entire documentation workflow.
           </p>
-        </motion.div>
+        </MotionDiv>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, i) => (
-            <motion.div
+            <MotionDiv
               key={feature.title}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -71,7 +73,7 @@ const FeaturesSection = () => {
               </div>
               <h3 className="text-lg font-semibold font-heading mb-2">{feature.title}</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
-            </motion.div>
+            </MotionDiv>
           ))}
         </div>
       </div>

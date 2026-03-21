@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
 
+const MotionDiv = motion.div;
+
 const steps = [
   {
     number: "01",
@@ -27,7 +29,7 @@ const HowItWorksSection = () => {
   return (
     <section id="how-it-works" className="py-24 px-6 bg-secondary/50">
       <div className="container max-w-6xl mx-auto">
-        <motion.div
+        <MotionDiv
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -40,11 +42,11 @@ const HowItWorksSection = () => {
           <h2 className="text-3xl md:text-4xl font-bold font-heading mb-4">
             From Consultation to Medical Record in Minutes
           </h2>
-        </motion.div>
+        </MotionDiv>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((step, i) => (
-            <motion.div
+            <MotionDiv
               key={step.number}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -60,7 +62,7 @@ const HowItWorksSection = () => {
               {i < steps.length - 1 && (
                 <div className="hidden lg:block absolute top-8 -right-4 w-8 border-t-2 border-dashed border-primary/20" />
               )}
-            </motion.div>
+            </MotionDiv>
           ))}
         </div>
       </div>

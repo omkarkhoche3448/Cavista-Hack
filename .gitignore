@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+backend/.env
+ai/.env
 
 # Editor directories and files
 !.vscode/extensions.json
@@ -29,3 +32,7 @@ PLAN.md
 doc/
 
 venv/
+.venv/
+backend/venv/
+backend/__pycache__/
+ai/__pycache__/
