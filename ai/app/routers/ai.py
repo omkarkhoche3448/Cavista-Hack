@@ -6,6 +6,7 @@ import base64
 import io
 import requests
 import json
+import logging
 from datetime import datetime
 import ipaddress
 import socket
@@ -39,6 +40,7 @@ router = APIRouter(
     prefix="/ai",
     tags=["ai"],
 )
+logger = logging.getLogger(__name__)
 
 @lru_cache
 def get_settings():
@@ -158,6 +160,76 @@ def _as_text(value: Any) -> str:
     return str(value).strip()
 
 
+def _build_model_candidates(settings: Settings) -> list[str]:
+    configured = _as_text(getattr(settings, "GEMINI_MODEL", ""))
+    fallback_csv = _as_text(getattr(settings, "GEMINI_FALLBACK_MODELS", ""))
+
+    candidates: list[str] = []
+    if configured:
+        candidates.append(configured)
+    if fallback_csv:
+        candidates.extend(
+            item.strip()
+            for item in fallback_csv.split(",")
+            if item and item.strip()
+        )
+
+    # Keep an internal fallback chain even if env vars are missing.
+    candidates.extend(["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"])
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for model_name in candidates:
+        if model_name in seen:
+            continue
+        seen.add(model_name)
+        deduped.append(model_name)
+    return deduped
+
+
+def _is_model_unavailable_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return "404" in text and "model" in text and (
+        "not found" in text or "no longer available" in text
+    )
+
+
+def _generate_content_with_model_fallback(
+    *,
+    client: genai.Client,
+    settings: Settings,
+    contents: list[str],
+    config: types.GenerateContentConfig,
+):
+    models = _build_model_candidates(settings)
+    last_error: Exception | None = None
+
+    for model_name in models:
+        try:
+            return client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config,
+            )
+        except Exception as error:
+            last_error = error
+            if _is_model_unavailable_error(error):
+                logger.warning(
+                    "Gemini model unavailable. Retrying fallback model=%s error=%s",
+                    model_name,
+                    str(error),
+                )
+                continue
+            raise
+
+    attempted = ", ".join(models) if models else "<none>"
+    if last_error:
+        raise RuntimeError(
+            f"No configured Gemini models are available. Tried: {attempted}. Last error: {last_error}"
+        ) from last_error
+    raise RuntimeError(f"No Gemini model is configured. Tried: {attempted}")
+
+
 def _extract_diagnosis_text(item: Any) -> str:
     if isinstance(item, dict):
         for key in ("diagnosis_text", "diagnosis", "title", "name", "assessment", "description"):
@@ -273,10 +345,11 @@ def analyze_lab_report(
             response_schema=schema
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite", # Upgraded to 2.0
+        response = _generate_content_with_model_fallback(
+            client=client,
+            settings=settings,
             contents=[prompt],
-            config=config
+            config=config,
         )
 
         if not response or not response.text:
@@ -357,10 +430,11 @@ def lab_report_to_json(
             response_schema=schema
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
+        response = _generate_content_with_model_fallback(
+            client=client,
+            settings=settings,
             contents=[prompt],
-            config=config
+            config=config,
         )
 
         if not response or not response.text:
@@ -421,10 +495,11 @@ def generate_emr(
             response_schema=schema
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
+        response = _generate_content_with_model_fallback(
+            client=client,
+            settings=settings,
             contents=[prompt],
-            config=config
+            config=config,
         )
 
         if not response or not response.text:
@@ -785,10 +860,11 @@ def generate_emr_pdf_endpoint(
             response_schema=schema
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
+        response = _generate_content_with_model_fallback(
+            client=client,
+            settings=settings,
             contents=[prompt],
-            config=config
+            config=config,
         )
 
         if not response or not response.text:

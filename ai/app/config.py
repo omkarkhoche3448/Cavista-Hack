@@ -7,6 +7,11 @@ dotenv.load_dotenv()
 
 class Settings(BaseSettings):
     GOOGLE_API_KEY: str = ""
+    GEMINI_MODEL: str = Field(
+        default="gemini-2.0-flash",
+        validation_alias=AliasChoices("GEMINI_MODEL", "GENAI_MODEL", "GOOGLE_MODEL"),
+    )
+    GEMINI_FALLBACK_MODELS: str = "gemini-2.5-flash,gemini-1.5-flash"
     HF_TOKEN: str = ""
     DATABASE_URL: str | None = None
     user: str | None = None
