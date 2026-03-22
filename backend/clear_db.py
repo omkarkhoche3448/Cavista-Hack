@@ -10,23 +10,20 @@ key: str = os.environ.get("SUPABASE_KEY")
 
 schema_map = {
     "public": [
-        "session_state_history", 
-        "transcript_chunks", 
-        "final_transcripts", 
-        "session_document_shares", 
-        "medical_documents", 
-        "sessions", 
-        "integration_logs",
+        "session_state_history",
+        "transcript_chunks",
+        "final_transcripts",
+        "session_document_shares",
+        "pre_session_insights",
+        "medical_documents",
         "icd_mappings",
         "treatment_suggestions",
         "patient_summaries",
-        "emr_drafts",
         "final_emrs",
-        "export_logs",
-        "pre_session_insights",
-        "ws_events",
-        "ws_connections",
-        "notifications"
+        "emr_drafts",
+        "doctor_notes",
+        "notifications",
+        "sessions",
     ]
 }
 

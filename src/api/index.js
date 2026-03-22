@@ -18,11 +18,3 @@ export const DOCUMENTS_API = `${API_URL}/api/documents`;
 
 // EMR
 export const EMR_API = `${API_URL}/api/emr`;
-
-// Patient
-export const PATIENT_API = `${API_URL}/api/patient`;
-export const PATIENT_SUMMARIES_URL = `${PATIENT_API}/summaries`;
-export const PATIENT_DOCUMENTS_URL = `${PATIENT_API}/documents`;
-export const PATIENT_DOCUMENTS_UPLOAD_URL = `${PATIENT_API}/documents/upload`;
-export const PATIENT_NOTIFICATIONS_URL = `${PATIENT_API}/notifications`;
-export const PATIENT_SESSIONS_PENDING_URL = `${PATIENT_API}/sessions/pending`;

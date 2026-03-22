@@ -32,9 +32,14 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      await signUpWithEmail({ email, password, firstName, lastName, role });
+      const { session } = await signUpWithEmail({ email, password, firstName, lastName, role });
+      if (!session) {
+        navigate("/login", { replace: true });
+        return;
+      }
+
       await refreshProfile();
-      navigate(`/${role}/dashboard`, { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err.message || "Signup failed.");
     } finally {

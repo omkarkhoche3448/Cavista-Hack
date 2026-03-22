@@ -3,21 +3,7 @@
  */
 
 import { DOCUMENTS_API } from "@/api";
-
-async function authFetch(url, options = {}, token) {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Request failed");
-  }
-  return res.json();
-}
+import { apiRequest } from "@/services/apiClient";
 
 export async function uploadDocument(token, { file, title, documentType = "other", description = "" }) {
   const formData = new FormData();
@@ -26,46 +12,35 @@ export async function uploadDocument(token, { file, title, documentType = "other
   formData.append("document_type", documentType);
   if (description) formData.append("description", description);
 
-  const res = await fetch(DOCUMENTS_API, {
+  return apiRequest(DOCUMENTS_API, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    token,
     body: formData,
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Upload failed");
-  }
-  return res.json();
 }
 
 export async function listDocuments(token) {
-  return authFetch(DOCUMENTS_API, {}, token);
+  return apiRequest(DOCUMENTS_API, { token });
 }
 
 export async function shareDocuments(token, { sessionId, documentIds }) {
-  return authFetch(`${DOCUMENTS_API}/share`, {
+  return apiRequest(`${DOCUMENTS_API}/share`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+    token,
+    json: {
       session_id: sessionId,
       document_ids: documentIds,
-    }),
-  }, token);
+    },
+  });
 }
 
 export async function getSessionDocuments(token, sessionId) {
-  return authFetch(`${DOCUMENTS_API}/session/${sessionId}`, {}, token);
+  return apiRequest(`${DOCUMENTS_API}/session/${sessionId}`, { token });
 }
 
 export async function deleteDocument(token, documentId) {
-  const res = await fetch(`${DOCUMENTS_API}/${documentId}`, {
+  await apiRequest(`${DOCUMENTS_API}/${documentId}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    token,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Delete failed");
-  }
 }
-

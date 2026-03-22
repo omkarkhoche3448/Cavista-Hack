@@ -1,12 +1,11 @@
 fastapi
 uvicorn
 pydantic
-google-genai
+pydantic-settings
+python-dotenv
 requests
 Pillow
-pydantic
-python-dotenv
-pydantic-settings
+google-genai
 sqlalchemy
 psycopg2-binary
 pyjwt

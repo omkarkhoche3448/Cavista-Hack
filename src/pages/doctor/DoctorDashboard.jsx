@@ -345,7 +345,7 @@ export default function DoctorDashboard() {
       setRequestSent(true);
       // Keep waiting UI active until WebSocket notifies approval/rejection
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || "Failed to send request");
+      setError(err.message || "Failed to send request");
       setShowMicAnimation(false);
       setIsCreating(false);
       setRequestSent(false);

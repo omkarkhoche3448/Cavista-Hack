@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import DefaultLayout from "./components/layout/DefaultLayout";
 import {
   LoginPage,
@@ -34,18 +35,21 @@ const ProtectedDoctorRoute = ({ children }) => (
 );
 
 const ProtectedPatientRoute = ({ children }) => {
-  const { profile, loading, isAuthenticated } = useAuth();
+  const { profile, role, loading, isAuthenticated } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return null; // Or a loader
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (
     isAuthenticated &&
-    profile &&
-    profile.role === "patient" &&
-    profile.status !== "active" &&
+    role === "patient" &&
+    profile?.status !== "active" &&
     location.pathname !== "/patient/onboarding"
   ) {
     return <Navigate to="/patient/onboarding" replace />;
@@ -151,70 +155,77 @@ export default function AppRouter() {
           </ProtectedDoctorRoute>
         }
       />
-      {/* Patient Routes
-      <Route
-        path="/patient"
-        element={
-          <ProtectedPatientRoute>
-            <PatientDashboardLayout />
-          </ProtectedPatientRoute>
-        }
-      > */}
+      {/* Patient Routes */}
+      <Route path="/patient" element={<Navigate to="/patient/dashboard" replace />} />
 
       <Route
         path="/patient/dashboard"
         element={
-          <ProtectedPatientRoute>
-            <PatientDashboard />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientDashboard />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/call/:sessionId"
         element={
-          <ProtectedPatientRoute>
-            <PatientCall />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientCall />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/sessions"
         element={
-          <ProtectedPatientRoute>
-            <PatientAllSessions />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientAllSessions />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/session/:sessionId"
         element={
-          <ProtectedPatientRoute>
-            <PatientSessionPage />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientSessionPage />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/uploads"
         element={
-          <ProtectedPatientRoute>
-            <Uploads />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <Uploads />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/profile"
         element={
-          <ProtectedPatientRoute>
-            <PatientProfile />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <PatientProfile />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
       <Route
         path="/patient/onboarding"
         element={
-          <ProtectedPatientRoute>
-            <Onboarding />
-          </ProtectedPatientRoute>
+          <DefaultLayout>
+            <ProtectedPatientRoute>
+              <Onboarding />
+            </ProtectedPatientRoute>
+          </DefaultLayout>
         }
       />
 

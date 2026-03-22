@@ -1,12 +1,32 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Activity, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth";
 import { signOut } from "@/services/authService";
+import { cn } from "@/lib/utils";
+
+const ROLE_NAV_ITEMS = {
+  doctor: [
+    { label: "Dashboard", to: "/doctor/dashboard" },
+    { label: "Sessions", to: "/doctor/sessions" },
+    { label: "Patients", to: "/doctor/patients" },
+    { label: "Profile", to: "/doctor/profile" },
+  ],
+  patient: [
+    { label: "Dashboard", to: "/patient/dashboard" },
+    { label: "Sessions", to: "/patient/sessions" },
+    { label: "Uploads", to: "/patient/uploads" },
+    { label: "Profile", to: "/patient/profile" },
+  ],
+};
 
 export default function Navbar() {
-  const { isAuthenticated, profile, loading } = useAuth();
+  const { isAuthenticated, profile, role, user, loading } = useAuth();
   const navigate = useNavigate();
+  const effectiveRole = role ?? profile?.role ?? null;
+  const navItems = effectiveRole ? ROLE_NAV_ITEMS[effectiveRole] ?? [] : [];
+  const firstName = profile?.first_name || user?.user_metadata?.first_name || "User";
+  const lastName = profile?.last_name || user?.user_metadata?.last_name || "";
 
   async function handleLogout() {
     await signOut();
@@ -15,7 +35,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b glass-surface">
-      <div className="container max-w-6xl mx-auto px-6 h-16 flex justify-between items-center">
+      <div className="container max-w-6xl mx-auto px-6 h-16 flex items-center gap-6">
         <Link to="/home" className="flex items-center gap-2.5 no-underline">
           <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
             <Activity className="w-5 h-5 text-primary-foreground" />
@@ -25,18 +45,37 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-3">
+        {!loading && isAuthenticated && navItems.length > 0 && (
+          <nav className="hidden md:flex items-center gap-1 flex-1">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  cn(
+                    "px-3 py-2 rounded-lg text-sm font-semibold transition-colors",
+                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
+
+        <div className="flex items-center gap-3 ml-auto">
           {!loading && (
             <>
               {isAuthenticated ? (
                 <div className="flex items-center gap-4">
                   <div className="hidden sm:flex flex-col items-end">
                     <span className="text-sm font-bold text-foreground">
-                      {profile?.first_name} {profile?.last_name}
+                      {firstName} {lastName}
                     </span>
-                    {profile?.role && (
+                    {effectiveRole && (
                       <span className="text-[10px] font-semibold text-primary uppercase tracking-wider">
-                        {profile.role}
+                        {effectiveRole}
                       </span>
                     )}
                   </div>

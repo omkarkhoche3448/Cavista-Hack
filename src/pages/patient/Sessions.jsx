@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { listSessions } from "@/services/sessionService";
-import { Eye, Clock, CheckCircle, XCircle, Activity, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Eye, Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const STATUS_CONFIG = {
@@ -79,7 +78,7 @@ export default function PatientAllSessions() {
             <thead>
               <tr className="border-b bg-muted/40">
                 <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Session ID</th>
-                <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Patient</th>
+                <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Doctor</th>
                 <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</th>
                 <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
                 <th className="px-5 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Time</th>
@@ -122,10 +121,10 @@ export default function PatientAllSessions() {
                         {formatSessionId(session.id)}
                       </td>
                       <td className="px-5 py-4 text-foreground">
-                        {session.patient_name ?? "—"}
+                        {session.doctor_name ?? "—"}
                       </td>
                       <td className="px-5 py-4 text-primary">
-                        {session.patient_email ?? "—"}
+                        {session.doctor_email ?? "—"}
                       </td>
                       <td className="px-5 py-4 text-foreground">
                         {session.created_at ? formatDate(session.created_at) : "—"}

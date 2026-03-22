@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 class ImageAdRequest(BaseModel):
     image_url: Optional[str] = None
@@ -10,7 +10,8 @@ class AIAnalysisResponse(BaseModel):
     insights: str
 
 class LabReportRequest(BaseModel):
-    pdf_url: str = None
+    pdf_url: Optional[str] = None
+    pdf_base64: Optional[str] = None
     patient_id: Optional[str] = None
     patient_name: Optional[str] = None
     report_type: Optional[str] = None
@@ -18,7 +19,11 @@ class LabReportRequest(BaseModel):
 class LabReportSummaryResponse(BaseModel):
     summary: str
     key_findings: List[str]
-    recommendations: str
+    abnormal_results: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    risk_flags: List[str] = Field(default_factory=list)
+    medications_found: List[str] = Field(default_factory=list)
+    allergies_found: List[str] = Field(default_factory=list)
 
 class LabReportJSONResponse(BaseModel):
     report: List[str]
@@ -45,3 +50,54 @@ class EMRResponse(BaseModel):
     plan: List[str] = []
     follow_up: Optional[str] = None
     icd10_codes: List[str] = []
+
+
+class ICDMapRequest(BaseModel):
+    diagnoses: List[Any] = Field(default_factory=list)
+    conversation: Optional[str] = None
+
+
+class ICDMapItem(BaseModel):
+    diagnosis_text: str
+    icd_code: Optional[str] = None
+    icd_description: Optional[str] = None
+    confidence_score: float = 0.0
+    is_primary: bool = False
+
+
+class SuggestTreatmentsRequest(BaseModel):
+    diagnoses: List[Any] = Field(default_factory=list)
+    conversation: Optional[str] = None
+    current_medications: Optional[List[Any]] = None
+
+
+class TreatmentSuggestionItem(BaseModel):
+    suggestion_type: str
+    title: str
+    description: str
+    rationale: Optional[str] = None
+    priority: Optional[str] = None
+    contraindications: Optional[str] = None
+    evidence_basis: Optional[str] = None
+
+
+class PatientSummaryRequest(BaseModel):
+    emr_content: Dict[str, Any] = Field(default_factory=dict)
+    diagnoses: List[Any] = Field(default_factory=list)
+    treatments: List[Any] = Field(default_factory=list)
+
+
+class PatientSummaryResponse(BaseModel):
+    summary_text: str
+    key_takeaways: List[str] = Field(default_factory=list)
+    medications_list: List[str] = Field(default_factory=list)
+    follow_up_notes: str
+    warnings: List[str] = Field(default_factory=list)
+
+
+class LiveInsightRequest(BaseModel):
+    transcript: str = Field(min_length=1)
+
+
+class LiveInsightResponse(BaseModel):
+    insight: str

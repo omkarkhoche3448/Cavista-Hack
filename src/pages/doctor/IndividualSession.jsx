@@ -135,7 +135,9 @@ export default function IndividualSession() {
     } catch (err) {
       console.error("Failed to start recording:", err);
       if (err.name === "NotAllowedError") {
-        alert("Microphone access denied. Please allow microphone access.");
+        toast.error("Microphone access denied. Please allow microphone access.");
+      } else {
+        toast.error(err.message || "Unable to start recording.");
       }
     }
   }, [token, sessionId, startAudioRecording]);

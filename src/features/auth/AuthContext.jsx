@@ -29,6 +29,8 @@ export function AuthProvider({ children }) {
       setProfile(data);
     } catch (err) {
       console.error("[AuthContext] Profile fetch failed:", err);
+      setProfile(null);
+      fetchedUserIdRef.current = null;
     }
   }, []); // empty deps — uses ref, not state
 
@@ -42,9 +44,10 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
+      setLoading(true);
       setSession(s);
       setUser(s?.user ?? null);
-      loadProfile(s);
+      loadProfile(s).finally(() => setLoading(false));
     });
 
     return () => subscription.unsubscribe();

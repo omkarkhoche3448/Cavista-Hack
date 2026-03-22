@@ -2,16 +2,13 @@ fastapi
 uvicorn[standard]
 pydantic
 pydantic-settings
-google-genai
 requests
-Pillow
 python-dotenv
 python-multipart
-# Real-time / async
-websockets
 # AWS
 boto3
 # Supabase
 supabase
 python-jose[cryptography]
 email-validator
+psycopg2-binary

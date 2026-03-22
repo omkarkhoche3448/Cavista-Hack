@@ -1,5 +1,6 @@
 import { supabase } from "@/config/supabase";
 import { PROFILE_URL, ONBOARD_URL } from "@/api";
+import { apiRequest } from "@/services/apiClient";
 
 export async function signUpWithEmail({
   email,
@@ -58,50 +59,21 @@ export async function getSession() {
 }
 
 export async function fetchProfile(accessToken) {
-  const res = await fetch(PROFILE_URL, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || "Failed to fetch profile");
-  }
-
-  return res.json();
+  return apiRequest(PROFILE_URL, { token: accessToken });
 }
 
 export async function updateProfile(accessToken, updates) {
-  const res = await fetch(PROFILE_URL, {
+  return apiRequest(PROFILE_URL, {
     method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(updates),
+    token: accessToken,
+    json: updates,
   });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || "Failed to update profile");
-  }
-
-  return res.json();
 }
 
 export async function onboardPatient(accessToken, data) {
-  const res = await fetch(ONBOARD_URL, {
+  return apiRequest(ONBOARD_URL, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
+    token: accessToken,
+    json: data,
   });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || "Failed to complete onboarding");
-  }
-
-  return res.json();
 }

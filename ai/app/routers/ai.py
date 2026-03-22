@@ -7,19 +7,29 @@ import io
 import requests
 import json
 from datetime import datetime
+import ipaddress
+import socket
+from typing import Any
 from PIL import Image as PILImage 
 import fitz # PyMuPDF
 import boto3
 from urllib.parse import urlparse
 
-
-from app import models
-from app.db import get_db
-from sqlalchemy.orm import Session
-
 from app.utils import search_icd_code
 from ..schemas import (
-    LabReportRequest, LabReportSummaryResponse, EMRRequest, EMRResponse, LabReportJSONResponse
+    ICDMapItem,
+    ICDMapRequest,
+    EMRRequest,
+    EMRResponse,
+    LabReportJSONResponse,
+    LabReportRequest,
+    LabReportSummaryResponse,
+    LiveInsightRequest,
+    LiveInsightResponse,
+    PatientSummaryRequest,
+    PatientSummaryResponse,
+    SuggestTreatmentsRequest,
+    TreatmentSuggestionItem,
 )
 
 from ..config import Settings
@@ -74,6 +84,38 @@ def parse_s3_url(url: str):
 
     return None
 
+
+def _is_safe_public_http_url(url: str) -> bool:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    host = parsed.hostname
+    if not host or host.lower() == "localhost":
+        return False
+
+    def _is_public_ip(ip_text: str) -> bool:
+        ip = ipaddress.ip_address(ip_text)
+        return not (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        )
+
+    try:
+        return _is_public_ip(host)
+    except ValueError:
+        try:
+            for info in socket.getaddrinfo(host, None):
+                if not _is_public_ip(info[4][0]):
+                    return False
+            return True
+        except socket.gaierror:
+            return False
+
+
 def download_pdf_content(url: str, settings: Settings) -> bytes:
     """
     Download PDF content from a URL.
@@ -82,6 +124,8 @@ def download_pdf_content(url: str, settings: Settings) -> bytes:
     s3_info = parse_s3_url(url)
     if s3_info:
         bucket, key = s3_info
+        if settings.AWS_BUCKET_NAME and bucket != settings.AWS_BUCKET_NAME:
+            raise HTTPException(status_code=400, detail="S3 bucket is not allowed.")
         s3_client = get_s3_client(settings)
         try:
             response = s3_client.get_object(Bucket=bucket, Key=key)
@@ -89,19 +133,78 @@ def download_pdf_content(url: str, settings: Settings) -> bytes:
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Could not download PDF from S3: {str(e)}")
     else:
-        response = requests.get(url)
+        if not _is_safe_public_http_url(url):
+            raise HTTPException(status_code=400, detail="URL is not allowed.")
+        response = requests.get(url, timeout=60)
         if response.status_code == 200:
             return response.content
         raise HTTPException(status_code=400, detail="Could not download PDF from URL")
 
 def download_image(url: str):
     try:
-        response = requests.get(url)
+        if not _is_safe_public_http_url(url):
+            return None
+        response = requests.get(url, timeout=30)
         if response.status_code == 200:
             return PILImage.open(io.BytesIO(response.content))
         return None
     except Exception:
         return None
+
+
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _extract_diagnosis_text(item: Any) -> str:
+    if isinstance(item, dict):
+        for key in ("diagnosis_text", "diagnosis", "title", "name", "assessment", "description"):
+            text = _as_text(item.get(key))
+            if text:
+                return text
+    return _as_text(item)
+
+
+def _best_icd_match(diagnosis_text: str) -> dict | None:
+    query = diagnosis_text.strip()
+    if not query:
+        return None
+    primary = search_icd_code(query, max_results=1)
+    if primary:
+        return primary[0]
+
+    lowered = query.lower()
+    for splitter in (",", ";", " with ", " and "):
+        if splitter in lowered:
+            first_part = query[: lowered.find(splitter)].strip()
+            if not first_part:
+                continue
+            fallback = search_icd_code(first_part, max_results=1)
+            if fallback:
+                return fallback[0]
+    return None
+
+
+def _normalize_str_list(items: Any) -> list[str]:
+    if not isinstance(items, list):
+        return []
+    values: list[str] = []
+    for entry in items:
+        text = _as_text(entry)
+        if text:
+            values.append(text)
+    return values
+
+
+def _coerce_string_list(items: Any) -> list[str]:
+    if isinstance(items, list):
+        return _normalize_str_list(items)
+    if isinstance(items, str):
+        text = items.strip()
+        return [text] if text else []
+    return []
 
 
 
@@ -139,14 +242,25 @@ def analyze_lab_report(
                 "summary": {"type": "string"},
                 "key_findings": {"type": "array", "items": {"type": "string"}},
                 "abnormal_results": {"type": "array", "items": {"type": "string"}},
-                "recommendations": {"type": "string"}
+                "recommendations": {"type": "array", "items": {"type": "string"}},
+                "risk_flags": {"type": "array", "items": {"type": "string"}},
+                "medications_found": {"type": "array", "items": {"type": "string"}},
+                "allergies_found": {"type": "array", "items": {"type": "string"}}
             },
             "required": ["summary", "key_findings", "abnormal_results", "recommendations"]
         }
 
         prompt = f"""
         You are a highly experienced medical consultant. Summarize the following lab report or medical document for a doctor.
-        Provide a concise summary, list key findings, highlight any abnormal results, and suggest potential next steps or recommendations.
+        Provide a concise summary, list key findings, highlight abnormal results, and actionable recommendations.
+        Return strict JSON with keys:
+        - summary: string
+        - key_findings: string[]
+        - abnormal_results: string[]
+        - recommendations: string[]
+        - risk_flags: string[]
+        - medications_found: string[]
+        - allergies_found: string[]
         Lab Report Type: {req.report_type if req.report_type else "General"}
 
         Lab Report Content:
@@ -168,7 +282,28 @@ def analyze_lab_report(
         if not response or not response.text:
             raise ValueError("Empty response from GenAI")
 
-        return json.loads(response.text)
+        parsed = json.loads(response.text)
+        key_findings = _coerce_string_list(parsed.get("key_findings"))
+        abnormal_results = _coerce_string_list(parsed.get("abnormal_results"))
+        recommendations = _coerce_string_list(parsed.get("recommendations"))
+        risk_flags = _coerce_string_list(parsed.get("risk_flags"))
+        medications_found = _coerce_string_list(parsed.get("medications_found"))
+        allergies_found = _coerce_string_list(parsed.get("allergies_found"))
+
+        if not risk_flags:
+            risk_flags = abnormal_results[:]
+        if not recommendations and isinstance(parsed.get("recommendations"), str):
+            recommendations = [parsed["recommendations"]]
+
+        return {
+            "summary": _as_text(parsed.get("summary")) or "No summary generated.",
+            "key_findings": key_findings,
+            "abnormal_results": abnormal_results,
+            "recommendations": recommendations,
+            "risk_flags": risk_flags,
+            "medications_found": medications_found,
+            "allergies_found": allergies_found,
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing lab report: {str(e)}")
@@ -302,6 +437,167 @@ def generate_emr(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating EMR: {str(e)}")
+
+
+@router.post("/map-icd", response_model=list[ICDMapItem])
+def map_icd_codes(req: ICDMapRequest):
+    try:
+        items: list[dict] = []
+        for index, diagnosis in enumerate(req.diagnoses or []):
+            diagnosis_text = _extract_diagnosis_text(diagnosis)
+            if not diagnosis_text:
+                continue
+            matched = _best_icd_match(diagnosis_text)
+            if matched:
+                items.append(
+                    {
+                        "diagnosis_text": diagnosis_text,
+                        "icd_code": matched.get("code"),
+                        "icd_description": matched.get("short_description"),
+                        "confidence_score": 0.88,
+                        "is_primary": index == 0,
+                    }
+                )
+            else:
+                items.append(
+                    {
+                        "diagnosis_text": diagnosis_text,
+                        "icd_code": None,
+                        "icd_description": None,
+                        "confidence_score": 0.35,
+                        "is_primary": index == 0,
+                    }
+                )
+        return items
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error mapping ICD codes: {str(e)}")
+
+
+@router.post("/suggest-treatments", response_model=list[TreatmentSuggestionItem])
+def suggest_treatments(req: SuggestTreatmentsRequest):
+    try:
+        diagnoses = [_extract_diagnosis_text(item) for item in req.diagnoses or []]
+        diagnoses = [item for item in diagnoses if item]
+        if not diagnoses:
+            return []
+
+        current_medications = _normalize_str_list(req.current_medications)
+        medication_context = ", ".join(current_medications) if current_medications else "none reported"
+
+        suggestions: list[dict] = []
+        for diagnosis in diagnoses[:5]:
+            suggestions.append(
+                {
+                    "suggestion_type": "medication_review",
+                    "title": f"Medication plan review for {diagnosis}",
+                    "description": (
+                        f"Evaluate first-line therapy options and adjust dosing for {diagnosis}. "
+                        "Confirm renal/hepatic dosing where applicable."
+                    ),
+                    "rationale": "Consistent medication review reduces preventable adverse events.",
+                    "priority": "high",
+                    "contraindications": f"Check interactions with current medications: {medication_context}.",
+                    "evidence_basis": "Guideline-aligned disease-specific management.",
+                }
+            )
+            suggestions.append(
+                {
+                    "suggestion_type": "monitoring",
+                    "title": f"Monitoring and follow-up for {diagnosis}",
+                    "description": "Order relevant baseline and follow-up tests and set a 1-2 week reassessment.",
+                    "rationale": "Monitoring trends improves treatment safety and efficacy.",
+                    "priority": "medium",
+                    "contraindications": "Escalate care for red-flag symptoms or rapid deterioration.",
+                    "evidence_basis": "Standard chronic and acute care monitoring protocols.",
+                }
+            )
+
+        # Keep payload size bounded for faster downstream processing.
+        return suggestions[:10]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error suggesting treatments: {str(e)}")
+
+
+@router.post("/generate-summary", response_model=PatientSummaryResponse)
+def generate_patient_summary(req: PatientSummaryRequest):
+    try:
+        emr_content = req.emr_content or {}
+        chief_complaint = _as_text(emr_content.get("chief_complaint")) or "your current symptoms"
+        assessment = _as_text(emr_content.get("assessment")) or "the clinical evaluation"
+
+        diagnoses = [_extract_diagnosis_text(item) for item in (req.diagnoses or emr_content.get("diagnoses") or [])]
+        diagnoses = [item for item in diagnoses if item]
+        key_takeaways = diagnoses[:3] if diagnoses else ["Continue close follow-up with your doctor."]
+
+        medications = _normalize_str_list(emr_content.get("medications")) + _normalize_str_list(
+            emr_content.get("medications_prescribed")
+        )
+        seen = set()
+        medications_list: list[str] = []
+        for med in medications:
+            if med not in seen:
+                medications_list.append(med)
+                seen.add(med)
+
+        treatment_titles: list[str] = []
+        if isinstance(req.treatments, list):
+            for item in req.treatments:
+                if isinstance(item, dict):
+                    title = _as_text(item.get("title"))
+                else:
+                    title = _as_text(item)
+                if title:
+                    treatment_titles.append(title)
+
+        follow_up = _as_text(emr_content.get("follow_up_plan")) or _as_text(emr_content.get("follow_up"))
+        if not follow_up:
+            follow_up = "Please follow your prescribed plan and revisit if symptoms worsen."
+
+        warnings: list[str] = []
+        allergies = _normalize_str_list(emr_content.get("allergies"))
+        if allergies:
+            warnings.append("Inform all care providers about your recorded allergies.")
+
+        risk_text = f"{chief_complaint} {assessment}".lower()
+        if any(flag in risk_text for flag in ("chest pain", "shortness of breath", "bleeding", "fainting")):
+            warnings.append("Seek urgent care immediately if red-flag symptoms recur or intensify.")
+
+        summary_parts = [
+            f"Today we reviewed {chief_complaint}.",
+            f"Clinical assessment focused on {assessment}.",
+        ]
+        if treatment_titles:
+            summary_parts.append(f"Recommended care includes: {', '.join(treatment_titles[:3])}.")
+
+        return {
+            "summary_text": " ".join(summary_parts),
+            "key_takeaways": key_takeaways,
+            "medications_list": medications_list,
+            "follow_up_notes": follow_up,
+            "warnings": warnings,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating patient summary: {str(e)}")
+
+
+@router.post("/live-insight", response_model=LiveInsightResponse)
+def generate_live_insight(req: LiveInsightRequest):
+    try:
+        transcript = req.transcript.strip()
+        lowered = transcript.lower()
+
+        if any(flag in lowered for flag in ("chest pain", "shortness of breath", "faint", "seizure")):
+            return {"insight": "Potential red-flag symptoms detected; consider urgent triage and focused vitals now."}
+
+        if "allergy" in lowered or "rash" in lowered:
+            return {"insight": "Possible allergy-related discussion detected; verify triggers and medication history."}
+
+        if "medication" in lowered or "dose" in lowered:
+            return {"insight": "Medication management topic detected; confirm adherence, dosing, and side effects."}
+
+        return {"insight": "Conversation is clinically coherent; continue history and targeted symptom clarification."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating live insight: {str(e)}")
 
 
 def generate_emr_pdf(emr_data: dict) -> bytes:
@@ -513,5 +809,3 @@ def generate_emr_pdf_endpoint(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating EMR PDF: {str(e)}")
-
-

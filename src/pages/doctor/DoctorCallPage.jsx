@@ -18,6 +18,7 @@ import {
   Stethoscope,
   Activity,
 } from "lucide-react";
+import { toast } from "sonner";
 import { getSession, startSession, endSession, transcribeAudio } from "@/services/sessionService";
 import { getSessionDocuments } from "@/services/documentService";
 import { getInsights } from "@/services/emrService";
@@ -129,7 +130,9 @@ export default function DoctorCall() {
     } catch (err) {
       console.error("Failed to start recording:", err);
       if (err.name === "NotAllowedError") {
-        alert("Microphone access denied. Please allow microphone access.");
+        toast.error("Microphone access denied. Please allow microphone access.");
+      } else {
+        toast.error(err.message || "Unable to start recording.");
       }
     }
   }, [token, sessionId, startAudioRecording]);
